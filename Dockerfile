@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
     ca-certificates \
+    fontconfig \
     fonts-liberation \
     chromium \
     chromium-driver \

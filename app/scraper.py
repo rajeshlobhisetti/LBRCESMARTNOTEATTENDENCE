@@ -26,53 +26,29 @@ def get_chrome_driver():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("--disable-software-rasterizer")
-    options.add_argument("--no-zygote")
-    options.add_argument("--single-process")
-    options.add_argument("--window-size=1280,720")
+    options.add_argument("--remote-debugging-pipe")
     options.add_argument("--disable-extensions")
-    options.add_argument("--disable-setuid-sandbox")
-    options.add_argument("--disable-background-networking")
-    options.add_argument("--disable-default-apps")
-    options.add_argument("--disable-sync")
-    options.add_argument("--disable-translate")
-    options.add_argument("--metrics-recording-only")
-    options.add_argument("--mute-audio")
-    options.add_argument("--no-first-run")
-    options.add_argument("--safebrowsing-disable-auto-update")
+    options.add_argument("--window-size=1280,720")
     options.add_argument("--blink-settings=imagesEnabled=false")
-    options.add_argument("--disk-cache-size=1")
-    options.add_argument("--media-cache-size=1")
-    options.add_argument("--js-flags=--max-old-space-size=128")
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
 
     # Detect linux chromium or google-chrome binary if present
-    for bin_path in [
-        shutil.which("chromium"),
-        shutil.which("chromium-browser"),
-        shutil.which("google-chrome"),
-        shutil.which("google-chrome-stable"),
-        "/usr/bin/chromium",
-        "/usr/bin/chromium-browser",
-        "/usr/bin/google-chrome"
-    ]:
-        if bin_path and os.path.exists(bin_path):
-            options.binary_location = bin_path
-            break
+    if os.path.exists("/usr/bin/chromium"):
+        options.binary_location = "/usr/bin/chromium"
+    elif os.path.exists("/usr/bin/chromium-browser"):
+        options.binary_location = "/usr/bin/chromium-browser"
+    elif os.path.exists("/usr/bin/google-chrome"):
+        options.binary_location = "/usr/bin/google-chrome"
 
     # Detect chromedriver service if present
     service = None
-    for driver_path in [
-        shutil.which("chromedriver"),
-        "/usr/bin/chromedriver",
-        "/usr/lib/chromium/chromedriver"
-    ]:
-        if driver_path and os.path.exists(driver_path):
-            service = Service(executable_path=driver_path)
-            break
+    if os.path.exists("/usr/bin/chromedriver"):
+        service = Service(executable_path="/usr/bin/chromedriver")
+    elif os.path.exists("/usr/lib/chromium/chromedriver"):
+        service = Service(executable_path="/usr/lib/chromium/chromedriver")
 
     if service:
         return webdriver.Chrome(service=service, options=options)
