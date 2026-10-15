@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+
+{% block title %}Student Registration &bull; LBRCE Attendance Alerts{% endblock %}
+
+{% block content %}
+<div class="relative overflow-hidden py-12 lg:py-16">
+  <!-- Subtle background glow -->
+  <div class="absolute top-10 left-1/2 -translate-x-1/2 w-full max-w-4xl h-96 bg-gradient-to-tr from-blue-300/30 to-indigo-300/20 blur-3xl pointer-events-none -z-10 rounded-full"></div>
+
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    
+    <!-- Hero Header -->
+    <div class="text-center max-w-2xl mx-auto mb-10">
+      <div class="inline-flex items-center space-x-2 px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-full mb-4">
+        <i class="fa-solid fa-bell animate-pulse"></i>
+        <span>Automated Twice-Daily Attendance Alerts</span>
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+        Never Miss an Attendance Update Again
+      </h1>
+      <p class="mt-3 text-base sm:text-lg text-slate-600">
+        Register with your LBRCE ERP details to receive complete subject-wise attendance and absence warnings directly on Telegram every morning & night at 8:00 o'clock.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      
+      <!-- Registration Form (7 cols) -->
+      <div class="lg:col-span-7 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sm:p-8">
+        <div class="flex items-center justify-between pb-6 border-b border-slate-100 mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">Student Registration</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Fill in your information to activate the automated scraping agent</p>
+          </div>
+          <span class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-user-plus"></i>
+          </span>
+        </div>
+
+        <form id="registrationForm" onsubmit="handleRegistration(event)" class="space-y-5">
+          
+          <!-- Full Name -->
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5" for="name">
+              Full Name <span class="text-rose-500">*</span>
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-user text-sm"></i>
+              </span>
+              <input type="text" id="name" name="name" required placeholder="e.g. Mohammad Iqbal"
+                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+            </div>
+          </div>
+
+          <!-- Roll Number (ERP Username) -->
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5" for="roll_no">
+              Roll Number (ERP Username) <span class="text-rose-500">*</span>
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-id-card text-sm"></i>
+              </span>
+              <input type="text" id="roll_no" name="roll_no" required placeholder="e.g. 23761A05N4"
+                style="text-transform:uppercase"
+                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono tracking-wide focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Used to log in to LBRCE ERP portal.</p>
+          </div>
+
+          <!-- Email Address -->
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5" for="email">
+              Email Address <span class="text-rose-500">*</span>
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-envelope text-sm"></i>
+              </span>
+              <input type="email" id="email" name="email" required placeholder="e.g. student@gmail.com"
+                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+            </div>
+            <p class="text-xs text-slate-400 mt-1">A registration success confirmation email will be sent here.</p>
+          </div>
+
+          <!-- Telegram Chat ID -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-700" for="telegram_chat_id">
+                Telegram Chat ID <span class="text-rose-500">*</span>
+              </label>
+              <a href="https://t.me/{{ bot_username|default('LBRCEattendancebot') }}" target="_blank"
+                class="text-xs text-blue-600 font-semibold hover:underline flex items-center">
+                <i class="fa-brands fa-telegram mr-1"></i> Get from bot
+              </a>
+            </div>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-hashtag text-sm"></i>
+              </span>
+              <input type="text" id="telegram_chat_id" name="telegram_chat_id" required placeholder="e.g. 7985297498"
+                class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+            </div>
+            <p class="text-xs text-slate-400 mt-1">See the right card for a 5-second guide on finding your Chat ID.</p>
+          </div>
+
+          <!-- ERP Password -->
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5" for="erp_password">
+              LBRCE ERP Password <span class="text-rose-500">*</span>
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <i class="fa-solid fa-key text-sm"></i>
+              </span>
+              <input type="password" id="erp_password" name="erp_password" required placeholder="Enter your ERP login password"
+                class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+              <button type="button" onclick="togglePasswordVisibility()" class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-eye text-sm" id="pwToggleIcon"></i>
+              </button>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Stored securely and used solely by the automated background scraping agent.</p>
+          </div>
+
+          <!-- Optional Test Credentials Button -->
+          <div class="pt-1">
+            <button type="button" onclick="verifyErpCredentials()" id="testErpBtn"
+              class="inline-flex items-center text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100 transition">
+              <i class="fa-solid fa-vial-circle-check text-blue-500 mr-1.5"></i>
+              <span>Verify ERP Login (Optional)</span>
+            </button>
+            <span id="erpVerifyStatus" class="ml-2 text-xs font-medium"></span>
+          </div>
+
+          <!-- Alert Banner -->
+          <div id="formAlert" class="hidden p-3.5 rounded-xl text-xs font-medium"></div>
+
+          <!-- Submit Button -->
+          <button type="submit" id="submitBtn"
+            class="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/25 transition duration-200 flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>Register & Activate Attendance Alerts</span>
+          </button>
+        </form>
+
+      </div>
+
+      <!-- Right Column: Telegram Instructions & Info (5 cols) -->
+      <div class="lg:col-span-5 space-y-6">
+        
+        <!-- Telegram Bot Guide Card -->
+        <div class="bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-xl">
+          <div class="flex items-center space-x-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center text-white text-xl">
+              <i class="fa-brands fa-telegram"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-base">How to get your Chat ID</h3>
+              <p class="text-xs text-blue-200">Takes less than 10 seconds</p>
+            </div>
+          </div>
+
+          <ol class="space-y-3.5 text-xs text-blue-100">
+            <li class="flex items-start">
+              <span class="w-5 h-5 rounded-full bg-blue-500/30 border border-blue-400/40 flex items-center justify-center text-white font-bold mr-2.5 mt-0.5 shrink-0">1</span>
+              <span>Open our Telegram Bot by clicking below:
+                <br>
+                <a href="https://t.me/{{ bot_username|default('LBRCEattendancebot') }}" target="_blank"
+                  class="inline-block mt-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg transition shadow">
+                  <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Open @{{ bot_username|default('LBRCEattendancebot') }}
+                </a>
+              </span>
+            </li>
+            <li class="flex items-start">
+              <span class="w-5 h-5 rounded-full bg-blue-500/30 border border-blue-400/40 flex items-center justify-center text-white font-bold mr-2.5 mt-0.5 shrink-0">2</span>
+              <span>Click <strong>Start</strong> or send <code>/start</code> in the chat.</span>
+            </li>
+            <li class="flex items-start">
+              <span class="w-5 h-5 rounded-full bg-blue-500/30 border border-blue-400/40 flex items-center justify-center text-white font-bold mr-2.5 mt-0.5 shrink-0">3</span>
+              <span>The bot will immediately send you your numeric <strong>Chat ID</strong>. Tap it to copy and paste it on the left!</span>
+            </li>
+          </ol>
+        </div>
+
+        <!-- Schedule Information Card -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+          <h4 class="font-bold text-sm text-slate-900 mb-3 flex items-center">
+            <i class="fa-regular fa-clock text-blue-600 mr-2"></i>
+            Automatic Delivery Schedule
+          </h4>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <div class="flex items-center space-x-3">
+                <span class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center text-xs">
+                  <i class="fa-solid fa-sun"></i>
+                </span>
+                <div>
+                  <p class="text-xs font-bold text-slate-800">Morning Dispatch</p>
+                  <p class="text-[11px] text-slate-500">Subject summary before day starts</p>
+                </div>
+              </div>
+              <span class="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg">8:00 AM</span>
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <div class="flex items-center space-x-3">
+                <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs">
+                  <i class="fa-solid fa-moon"></i>
+                </span>
+                <div>
+                  <p class="text-xs font-bold text-slate-800">Night Dispatch</p>
+                  <p class="text-[11px] text-slate-500">Final attendance & missed classes</p>
+                </div>
+              </div>
+              <span class="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg">8:00 PM</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Feature Points -->
+        <div class="bg-blue-50/50 rounded-2xl border border-blue-100 p-5 space-y-2.5 text-xs text-slate-600">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-check text-emerald-500"></i>
+            <span>Instant on-demand check anytime using <code>/attendance</code> in bot</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-check text-emerald-500"></i>
+            <span>Automated absence detection comparing previous records</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-check text-emerald-500"></i>
+            <span>Instant email confirmation with registration details</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function togglePasswordVisibility() {
+    const pwInput = document.getElementById('erp_password');
+    const icon = document.getElementById('pwToggleIcon');
+    if (pwInput.type === 'password') {
+      pwInput.type = 'text';
+      icon.classList.remove('fa-eye');
+      icon.classList.add('fa-eye-slash');
+    } else {
+      pwInput.type = 'password';
+      icon.classList.remove('fa-eye-slash');
+      icon.classList.add('fa-eye');
+    }
+  }
+
+  async function verifyErpCredentials() {
+    const roll_no = document.getElementById('roll_no').value.trim();
+    const erp_password = document.getElementById('erp_password').value.trim();
+    const statusSpan = document.getElementById('erpVerifyStatus');
+    const btn = document.getElementById('testErpBtn');
+
+    if (!roll_no || !erp_password) {
+      statusSpan.className = 'ml-2 text-xs font-medium text-amber-600';
+      statusSpan.innerHTML = '⚠️ Please enter Roll No and Password first';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i> Testing...';
+    statusSpan.innerHTML = '';
+
+    try {
+      const res = await fetch('/api/verify-erp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({roll_no, erp_password})
+      });
+      const data = await res.json();
+      if (data.valid) {
+        statusSpan.className = 'ml-2 text-xs font-semibold text-emerald-600';
+        statusSpan.innerHTML = '✅ Credentials Verified!';
+      } else {
+        statusSpan.className = 'ml-2 text-xs font-semibold text-rose-600';
+        statusSpan.innerHTML = '❌ ' + (data.message || 'Invalid credentials');
+      }
+    } catch (err) {
+      statusSpan.className = 'ml-2 text-xs font-semibold text-rose-600';
+      statusSpan.innerHTML = '❌ Verification error';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-vial-circle-check text-blue-500 mr-1.5"></i> Verify ERP Login';
+    }
+  }
+
+  async function handleRegistration(e) {
+    e.preventDefault();
+    const submitBtn = document.getElementById('submitBtn');
+    const alertBox = document.getElementById('formAlert');
+
+    const payload = {
+      name: document.getElementById('name').value.trim(),
+      roll_no: document.getElementById('roll_no').value.trim().toUpperCase(),
+      email: document.getElementById('email').value.trim(),
+      telegram_chat_id: document.getElementById('telegram_chat_id').value.trim(),
+      erp_password: document.getElementById('erp_password').value.trim()
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Registering student...';
+    alertBox.className = 'hidden';
+
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        window.location.href = `/register/success?roll_no=${encodeURIComponent(data.roll_no)}&name=${encodeURIComponent(data.name)}`;
+      } else {
+        alertBox.className = 'p-3.5 rounded-xl text-xs font-medium bg-rose-50 border border-rose-200 text-rose-700 block';
+        alertBox.innerHTML = '❌ ' + (data.detail || data.message || 'Registration failed. Please check inputs.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Register & Activate Attendance Alerts';
+      }
+    } catch (err) {
+      alertBox.className = 'p-3.5 rounded-xl text-xs font-medium bg-rose-50 border border-rose-200 text-rose-700 block';
+      alertBox.innerHTML = '❌ Network connection error. Please try again.';
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Register & Activate Attendance Alerts';
+    }
+  }
+</script>
+{% endblock %}

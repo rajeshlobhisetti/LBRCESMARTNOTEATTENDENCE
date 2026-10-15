@@ -1,0 +1,746 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard &bull; LBRCE Attendance Platform{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  
+  <!-- Top Bar -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-200 gap-4">
+    <div>
+      <div class="flex items-center space-x-3">
+        <h1 class="text-2xl font-bold text-slate-900">Admin Control Panel</h1>
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+          Live Bot Connected
+        </span>
+      </div>
+      <p class="text-xs text-slate-500 mt-1">
+        Full database access &bull; Automatic morning (8:00 AM) & night (8:00 PM) scraping agents
+      </p>
+    </div>
+
+    <div class="flex items-center space-x-3">
+      <button onclick="triggerAllNow()" id="triggerAllBtn"
+        class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition">
+        <i class="fa-solid fa-bolt mr-2"></i> Trigger Scrape for All Now
+      </button>
+      <button onclick="openAddStudentModal()"
+        class="inline-flex items-center px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition">
+        <i class="fa-solid fa-user-plus mr-1.5"></i> Add Student
+      </button>
+      <button onclick="handleAdminLogout()"
+        class="inline-flex items-center px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition border border-slate-200">
+        <i class="fa-solid fa-arrow-right-from-bracket mr-1.5"></i> Logout
+      </button>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="dashboardToast" class="hidden my-4 p-3.5 rounded-xl text-xs font-medium"></div>
+
+  <!-- Dedicated One-Click Scrape All Students Card -->
+  <div class="my-6 bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 border border-blue-500/30">
+    <div class="space-y-1.5 text-center md:text-left">
+      <div class="inline-flex items-center space-x-2 px-3 py-1 bg-amber-400/20 border border-amber-300/30 text-amber-300 rounded-full text-xs font-bold">
+        <i class="fa-solid fa-bolt animate-pulse"></i>
+        <span>Single-Click Global Action</span>
+      </div>
+      <h2 class="text-xl font-extrabold tracking-tight">Scrape All Registered Students & Compare Attendance</h2>
+      <p class="text-xs text-blue-100 max-w-2xl leading-relaxed">
+        With a single click, the backend agent logs into LBRCE ERP for every active student, compares with previous attendance to detect new absences, logs the snapshot in MongoDB, and delivers instant Telegram reports.
+      </p>
+    </div>
+    <div class="shrink-0 w-full md:w-auto">
+      <button onclick="triggerAllNow()" id="heroTriggerAllBtn"
+        class="w-full md:w-auto px-7 py-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-sm shadow-xl shadow-amber-400/20 transition transform active:scale-95 flex items-center justify-center space-x-2.5">
+        <i class="fa-solid fa-play text-xs"></i>
+        <span>Scrape All Students Now</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Metric Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 my-8">
+    
+    <!-- Total Students -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Students</span>
+        <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-users"></i>
+        </span>
+      </div>
+      <p class="text-2xl font-black text-slate-900 mt-2" id="metricTotalStudents">--</p>
+      <p class="text-[11px] text-slate-500 mt-1 flex items-center">
+        <span class="text-emerald-600 font-semibold mr-1" id="metricActiveStudents">-- active</span> in system
+      </p>
+    </div>
+
+    <!-- Average Attendance -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Avg Attendance</span>
+        <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-chart-pie"></i>
+        </span>
+      </div>
+      <p class="text-2xl font-black text-slate-900 mt-2" id="metricAvgAttendance">--</p>
+      <p class="text-[11px] text-slate-500 mt-1">Overall percentage average</p>
+    </div>
+
+    <!-- Today's Scrapes -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Scrapes</span>
+        <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-circle-check"></i>
+        </span>
+      </div>
+      <p class="text-2xl font-black text-slate-900 mt-2" id="metricSuccessScrapes">0</p>
+      <p class="text-[11px] text-slate-500 mt-1">
+        <span class="text-rose-600 font-semibold" id="metricFailedScrapes">0 failed</span> today
+      </p>
+    </div>
+
+    <!-- Schedule Info -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Cron Schedule</span>
+        <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-clock"></i>
+        </span>
+      </div>
+      <p class="text-sm font-bold text-slate-900 mt-2">8:00 AM & 8:00 PM</p>
+      <p class="text-[11px] text-slate-500 mt-1">Automatic twice-daily run</p>
+    </div>
+
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="border-b border-slate-200 mb-6">
+    <nav class="flex space-x-6 text-sm font-semibold">
+      <button onclick="switchTab('studentsTab')" id="tabBtnStudents" class="pb-3 border-b-2 border-blue-600 text-blue-600 flex items-center space-x-2">
+        <i class="fa-solid fa-user-group text-xs"></i>
+        <span>Registered Students</span>
+      </button>
+      <button onclick="switchTab('logsTab')" id="tabBtnLogs" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2">
+        <i class="fa-solid fa-list-check text-xs"></i>
+        <span>Scraping Logs & History</span>
+      </button>
+      <button onclick="switchTab('settingsTab')" id="tabBtnSettings" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2">
+        <i class="fa-solid fa-gear text-xs"></i>
+        <span>System & Bot Settings</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- TAB 1: STUDENTS -->
+  <div id="studentsTab" class="space-y-4">
+    <!-- Filters & Search -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200">
+      <div class="relative w-full sm:w-80">
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 text-xs">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </span>
+        <input type="text" id="searchInput" oninput="debounceFetchStudents()" placeholder="Search Roll No, Name, Chat ID..."
+          class="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div class="flex items-center space-x-2 w-full sm:w-auto">
+        <select id="statusFilter" onchange="fetchStudents()"
+          class="bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 rounded-lg px-3 py-2 focus:outline-none">
+          <option value="all">All Students</option>
+          <option value="active">Active Only</option>
+          <option value="inactive">Inactive Only</option>
+        </select>
+        <button onclick="fetchStudents()" class="p-2 text-slate-500 hover:text-blue-600 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Students Table -->
+    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200">
+              <th class="py-3.5 px-4">Student</th>
+              <th class="py-3.5 px-4">Roll Number</th>
+              <th class="py-3.5 px-4">Telegram Chat ID</th>
+              <th class="py-3.5 px-4">Attendance %</th>
+              <th class="py-3.5 px-4">Last Scraped</th>
+              <th class="py-3.5 px-4">Status</th>
+              <th class="py-3.5 px-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="studentsTableBody" class="divide-y divide-slate-100">
+            <tr>
+              <td colspan="7" class="py-8 text-center text-slate-400">
+                <i class="fa-solid fa-circle-notch fa-spin text-lg mr-2"></i> Loading students...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: SCRAPING LOGS -->
+  <div id="logsTab" class="hidden space-y-4">
+    <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
+      <div>
+        <h3 class="text-sm font-bold text-slate-800">Recent Attendance Scrape Events</h3>
+        <p class="text-xs text-slate-500">Live logs from scheduled cron and on-demand triggers</p>
+      </div>
+      <button onclick="fetchLogs()" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition border border-slate-200">
+        <i class="fa-solid fa-rotate mr-1"></i> Refresh Logs
+      </button>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200">
+              <th class="py-3 px-4">Time</th>
+              <th class="py-3 px-4">Roll Number</th>
+              <th class="py-3 px-4">Trigger</th>
+              <th class="py-3 px-4">Status</th>
+              <th class="py-3 px-4">Overall %</th>
+              <th class="py-3 px-4">Details / Errors</th>
+            </tr>
+          </thead>
+          <tbody id="logsTableBody" class="divide-y divide-slate-100">
+            <tr>
+              <td colspan="6" class="py-8 text-center text-slate-400">
+                <i class="fa-solid fa-circle-notch fa-spin text-lg mr-2"></i> Loading logs...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: SETTINGS -->
+  <div id="settingsTab" class="hidden space-y-6">
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-2xl">
+      <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center">
+        <i class="fa-solid fa-sliders text-blue-600 mr-2"></i> System Configuration
+      </h3>
+      
+      <div class="space-y-4 text-xs">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
+          <div>
+            <p class="font-bold text-slate-800">Telegram Bot Token</p>
+            <p class="text-slate-500 font-mono mt-0.5">{{ bot_token }}</p>
+          </div>
+          <span class="px-2 py-1 bg-emerald-100 text-emerald-700 font-bold rounded-lg text-[10px]">ACTIVE</span>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
+          <div>
+            <p class="font-bold text-slate-800">Bot Username</p>
+            <p class="text-blue-600 font-semibold mt-0.5">@{{ bot_username }}</p>
+          </div>
+          <a href="https://t.me/{{ bot_username }}" target="_blank" class="text-blue-600 hover:underline">
+            Test Bot &rarr;
+          </a>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
+          <div>
+            <p class="font-bold text-slate-800">Schedule Hours</p>
+            <p class="text-slate-500 mt-0.5">Morning: 08:00 AM &bull; Night: 08:00 PM (20:00)</p>
+          </div>
+          <span class="px-2 py-1 bg-blue-100 text-blue-700 font-bold rounded-lg text-[10px]">SCHEDULED</span>
+        </div>
+
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+          <p class="font-bold text-slate-800">Database</p>
+          <p class="text-slate-500 font-mono mt-0.5">MongoDB Atlas (cluster0.vyreenm.mongodb.net/attendence)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL: INSPECT STUDENT DETAILS -->
+<div id="inspectModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+    <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+      <div>
+        <h3 class="font-bold text-base text-slate-900" id="inspectStudentName">Student Attendance</h3>
+        <p class="text-xs text-slate-500 font-mono" id="inspectRollNo">--</p>
+      </div>
+      <button onclick="closeInspectModal()" class="text-slate-400 hover:text-slate-600 p-1">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+    
+    <div class="p-6 overflow-y-auto space-y-5 text-xs">
+      <div class="flex items-center justify-between p-4 bg-blue-50 border border-blue-100 rounded-xl">
+        <div>
+          <span class="text-slate-500 font-semibold">Overall Attendance:</span>
+          <span class="text-xl font-black text-blue-700 ml-2" id="inspectOverall">--</span>
+        </div>
+        <div class="text-right">
+          <span class="text-slate-400 block text-[10px]">Last Scraped</span>
+          <span class="font-semibold text-slate-700" id="inspectLastScraped">--</span>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-2">Subject-Wise Breakdown</h4>
+        <div class="border border-slate-200 rounded-xl overflow-hidden">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+              <tr>
+                <th class="py-2.5 px-3">Subject</th>
+                <th class="py-2.5 px-3 text-center">Held</th>
+                <th class="py-2.5 px-3 text-center">Present</th>
+                <th class="py-2.5 px-3 text-right">Percentage</th>
+              </tr>
+            </thead>
+            <tbody id="inspectSubjectsBody" class="divide-y divide-slate-100 font-medium"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+      <button onclick="closeInspectModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg text-xs">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ADD / EDIT STUDENT -->
+<div id="studentFormModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl p-6">
+    <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+      <h3 class="font-bold text-base text-slate-900" id="modalStudentTitle">Add New Student</h3>
+      <button onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-600 p-1">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+    </div>
+
+    <form id="studentEditForm" onsubmit="handleSaveStudent(event)" class="space-y-3.5 text-xs">
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Full Name</label>
+        <input type="text" id="modalName" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+      </div>
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Roll Number</label>
+        <input type="text" id="modalRollNo" required style="text-transform:uppercase" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono">
+      </div>
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Email</label>
+        <input type="email" id="modalEmail" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+      </div>
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">Telegram Chat ID</label>
+        <input type="text" id="modalChatId" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono">
+      </div>
+      <div>
+        <label class="block font-bold text-slate-700 mb-1">ERP Password</label>
+        <input type="password" id="modalErpPass" placeholder="Leave blank to keep unchanged" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+      </div>
+      <div class="flex items-center space-x-2 pt-2">
+        <input type="checkbox" id="modalIsActive" checked class="rounded text-blue-600 focus:ring-blue-500">
+        <label for="modalIsActive" class="font-semibold text-slate-700">Active (Receive 8 AM & 8 PM alerts)</label>
+      </div>
+
+      <div class="pt-4 flex justify-end space-x-2">
+        <button type="button" onclick="closeStudentModal()" class="px-3.5 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200">
+          Cancel
+        </button>
+        <button type="submit" id="saveStudentBtn" class="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow">
+          Save Student
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let editingRollNo = null;
+  let searchTimeout = null;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchStats();
+    fetchStudents();
+    fetchLogs();
+  });
+
+  function switchTab(tabId) {
+    ['studentsTab', 'logsTab', 'settingsTab'].forEach(id => {
+      document.getElementById(id).classList.add('hidden');
+    });
+    document.getElementById(tabId).classList.remove('hidden');
+
+    const btns = {
+      studentsTab: 'tabBtnStudents',
+      logsTab: 'tabBtnLogs',
+      settingsTab: 'tabBtnSettings'
+    };
+
+    Object.keys(btns).forEach(key => {
+      const btn = document.getElementById(btns[key]);
+      if (key === tabId) {
+        btn.className = 'pb-3 border-b-2 border-blue-600 text-blue-600 flex items-center space-x-2';
+      } else {
+        btn.className = 'pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2';
+      }
+    });
+
+    if (tabId === 'logsTab') fetchLogs();
+  }
+
+  function showToast(message, type = 'success') {
+    const toast = document.getElementById('dashboardToast');
+    toast.className = type === 'success' 
+      ? 'my-4 p-3.5 rounded-xl text-xs font-semibold bg-emerald-50 border border-emerald-200 text-emerald-800 block'
+      : 'my-4 p-3.5 rounded-xl text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-800 block';
+    toast.innerHTML = (type === 'success' ? '✅ ' : '❌ ') + message;
+    setTimeout(() => { toast.className = 'hidden'; }, 5000);
+  }
+
+  async function fetchStats() {
+    try {
+      const res = await fetch('/api/admin/stats');
+      if (res.status === 401) { window.location.href = '/admin/login'; return; }
+      const data = await res.json();
+      document.getElementById('metricTotalStudents').innerText = data.total_students;
+      document.getElementById('metricActiveStudents').innerText = `${data.active_students} active`;
+      document.getElementById('metricAvgAttendance').innerText = data.average_attendance;
+      document.getElementById('metricSuccessScrapes').innerText = data.today_success_scrapes;
+      document.getElementById('metricFailedScrapes').innerText = `${data.today_failed_scrapes} failed`;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function debounceFetchStudents() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(fetchStudents, 300);
+  }
+
+  async function fetchStudents() {
+    const search = document.getElementById('searchInput').value.trim();
+    const filter = document.getElementById('statusFilter').value;
+    const tbody = document.getElementById('studentsTableBody');
+
+    try {
+      const res = await fetch(`/api/admin/students?search=${encodeURIComponent(search)}&status_filter=${filter}`);
+      if (res.status === 401) { window.location.href = '/admin/login'; return; }
+      const data = await res.json();
+
+      if (!data.students || data.students.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400">No students registered yet.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.students.map(s => {
+        const attPct = s.last_overall_percentage || 'N/A';
+        const numPct = parseFloat((attPct || '').replace('%', ''));
+        let badgeColor = 'bg-slate-100 text-slate-700';
+        if (!isNaN(numPct)) {
+          badgeColor = numPct >= 75 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200';
+        }
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-3 px-4 font-bold text-slate-900">${s.name}</td>
+            <td class="py-3 px-4 font-mono font-semibold text-slate-700">${s.roll_no}</td>
+            <td class="py-3 px-4 font-mono text-slate-500">${s.telegram_chat_id}</td>
+            <td class="py-3 px-4">
+              <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                <span class="px-2 py-0.5 rounded-md font-bold text-[11px] ${badgeColor}">
+                  ${attPct}
+                </span>
+                ${s.last_absences && s.last_absences.length > 0 ? `
+                  <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-rose-100 text-rose-800 border border-rose-300 animate-pulse" title="${s.last_absences.map(a => a.subject + ': ' + a.classes_missed + ' missed').join(', ')}">
+                    🚨 ${s.last_absences.length} Absences
+                  </span>
+                ` : ''}
+              </div>
+            </td>
+            <td class="py-3 px-4 text-slate-500">${s.last_scraped_at || 'Never'}</td>
+            <td class="py-3 px-4">
+              <button onclick="toggleStudentActive('${s.roll_no}', ${!s.is_active})" 
+                class="px-2 py-0.5 rounded-full text-[10px] font-bold ${s.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}">
+                ${s.is_active ? 'Active' : 'Paused'}
+              </button>
+            </td>
+            <td class="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+              <button onclick="inspectStudent('${s.roll_no}')" title="Inspect Subjects" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+              <button onclick="triggerSingle('${s.roll_no}')" title="Scrape & Telegram Now" class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg">
+                <i class="fa-solid fa-bolt"></i>
+              </button>
+              <button onclick="openEditStudentModal('${s.roll_no}', '${s.name}', '${s.email}', '${s.telegram_chat_id}', ${s.is_active})" title="Edit" class="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button onclick="deleteStudent('${s.roll_no}')" title="Delete" class="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-rose-500">Failed to load students.</td></tr>';
+    }
+  }
+
+  async function fetchLogs() {
+    const tbody = document.getElementById('logsTableBody');
+    try {
+      const res = await fetch('/api/admin/logs?limit=40');
+      const data = await res.json();
+      if (!data.logs || data.logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-400">No logs recorded yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.logs.map(l => `
+        <tr class="hover:bg-slate-50/80 transition">
+          <td class="py-2.5 px-4 text-slate-500 whitespace-nowrap">${l.timestamp}</td>
+          <td class="py-2.5 px-4 font-mono font-bold text-slate-800">${l.roll_no}</td>
+          <td class="py-2.5 px-4 text-slate-600">${l.triggered_by}</td>
+          <td class="py-2.5 px-4">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${l.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+              ${l.status}
+            </span>
+          </td>
+          <td class="py-2.5 px-4 font-bold text-slate-700">${l.overall_percentage || '--'}</td>
+          <td class="py-2.5 px-4 text-slate-500 max-w-xs truncate">${l.error_message || (l.absences_count ? `⚠️ ${l.absences_count} absence(s)` : '✅ Up to date')}</td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-rose-500">Failed to load logs.</td></tr>';
+    }
+  }
+
+  async function inspectStudent(rollNo) {
+    try {
+      const res = await fetch(`/api/admin/students/${rollNo}`);
+      const data = await res.json();
+      const s = data.student;
+
+      document.getElementById('inspectStudentName').innerText = s.name;
+      document.getElementById('inspectRollNo').innerText = s.roll_no;
+      document.getElementById('inspectOverall').innerText = s.last_overall_percentage || 'N/A';
+      document.getElementById('inspectLastScraped').innerText = s.last_scraped_at || 'Never';
+
+      const tbody = document.getElementById('inspectSubjectsBody');
+      if (s.subjects && s.subjects.length > 0) {
+        tbody.innerHTML = s.subjects.map(subj => `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2 px-3 text-slate-800">${subj.subject}</td>
+            <td class="py-2 px-3 text-center text-slate-600">${subj.held}</td>
+            <td class="py-2 px-3 text-center text-slate-600">${subj.present}</td>
+            <td class="py-2 px-3 text-right font-bold text-slate-800">${subj.percentage}</td>
+          </tr>
+        `).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-400">No subject breakdown stored yet. Trigger a scrape to populate.</td></tr>';
+      }
+
+      document.getElementById('inspectModal').classList.remove('hidden');
+    } catch (e) {
+      showToast('Could not fetch student details', 'error');
+    }
+  }
+
+  function closeInspectModal() {
+    document.getElementById('inspectModal').classList.add('hidden');
+  }
+
+  async function triggerSingle(rollNo) {
+    showToast(`Triggering immediate scrape for ${rollNo}...`);
+    try {
+      const res = await fetch(`/api/admin/students/${rollNo}/trigger`, {method: 'POST'});
+      const data = await res.json();
+      showToast(data.message || 'Scrape initiated in background.');
+      setTimeout(() => { fetchStudents(); fetchStats(); }, 6000);
+    } catch (e) {
+      showToast('Error triggering scrape', 'error');
+    }
+  }
+
+  async function triggerAllNow() {
+    if (!confirm('Run attendance scraper & Telegram alerts for ALL active students right now?')) return;
+    const btn1 = document.getElementById('triggerAllBtn');
+    const btn2 = document.getElementById('heroTriggerAllBtn');
+
+    if (btn1) {
+      btn1.disabled = true;
+      btn1.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Running Batch...';
+    }
+    if (btn2) {
+      btn2.disabled = true;
+      btn2.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Scraping All Accounts...';
+    }
+
+    try {
+      const res = await fetch('/api/admin/trigger-all', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+      });
+      const data = await res.json();
+      showToast(data.message || 'Batch scrape initiated for all active students.');
+
+      // Poll updates every 3 seconds
+      let pollCount = 0;
+      const interval = setInterval(() => {
+        fetchStudents();
+        fetchStats();
+        fetchLogs();
+        pollCount++;
+        if (pollCount >= 5) clearInterval(interval);
+      }, 3000);
+
+    } catch (e) {
+      showToast('Failed to trigger batch run: ' + e, 'error');
+    } finally {
+      setTimeout(() => {
+        if (btn1) {
+          btn1.disabled = false;
+          btn1.innerHTML = '<i class="fa-solid fa-bolt mr-2"></i> Trigger Scrape for All Now';
+        }
+        if (btn2) {
+          btn2.disabled = false;
+          btn2.innerHTML = '<i class="fa-solid fa-play text-xs mr-2"></i> Scrape All Students Now';
+        }
+      }, 5000);
+    }
+  }
+
+  async function toggleStudentActive(rollNo, newStatus) {
+    try {
+      await fetch(`/api/admin/students/${rollNo}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({is_active: newStatus})
+      });
+      fetchStudents();
+      fetchStats();
+      showToast(`Student ${rollNo} status updated.`);
+    } catch (e) {
+      showToast('Failed to update status', 'error');
+    }
+  }
+
+  async function deleteStudent(rollNo) {
+    if (!confirm(`Are you sure you want to delete student ${rollNo}?`)) return;
+    try {
+      const res = await fetch(`/api/admin/students/${rollNo}`, {method: 'DELETE'});
+      if (res.ok) {
+        showToast(`Student ${rollNo} deleted.`);
+        fetchStudents();
+        fetchStats();
+      }
+    } catch (e) {
+      showToast('Error deleting student', 'error');
+    }
+  }
+
+  function openAddStudentModal() {
+    editingRollNo = null;
+    document.getElementById('modalStudentTitle').innerText = 'Add New Student';
+    document.getElementById('modalRollNo').disabled = false;
+    document.getElementById('modalName').value = '';
+    document.getElementById('modalRollNo').value = '';
+    document.getElementById('modalEmail').value = '';
+    document.getElementById('modalChatId').value = '';
+    document.getElementById('modalErpPass').value = '';
+    document.getElementById('modalErpPass').required = true;
+    document.getElementById('modalIsActive').checked = true;
+    document.getElementById('studentFormModal').classList.remove('hidden');
+  }
+
+  function openEditStudentModal(rollNo, name, email, chatId, isActive) {
+    editingRollNo = rollNo;
+    document.getElementById('modalStudentTitle').innerText = `Edit Student (${rollNo})`;
+    document.getElementById('modalRollNo').value = rollNo;
+    document.getElementById('modalRollNo').disabled = true;
+    document.getElementById('modalName').value = name;
+    document.getElementById('modalEmail').value = email;
+    document.getElementById('modalChatId').value = chatId;
+    document.getElementById('modalErpPass').value = '';
+    document.getElementById('modalErpPass').required = false;
+    document.getElementById('modalIsActive').checked = isActive;
+    document.getElementById('studentFormModal').classList.remove('hidden');
+  }
+
+  function closeStudentModal() {
+    document.getElementById('studentFormModal').classList.add('hidden');
+  }
+
+  async function handleSaveStudent(e) {
+    e.preventDefault();
+    const btn = document.getElementById('saveStudentBtn');
+    btn.disabled = true;
+
+    const name = document.getElementById('modalName').value.trim();
+    const roll_no = document.getElementById('modalRollNo').value.trim().toUpperCase();
+    const email = document.getElementById('modalEmail').value.trim();
+    const telegram_chat_id = document.getElementById('modalChatId').value.trim();
+    const erp_password = document.getElementById('modalErpPass').value.trim();
+    const is_active = document.getElementById('modalIsActive').checked;
+
+    try {
+      if (editingRollNo) {
+        const payload = {name, email, telegram_chat_id, is_active};
+        if (erp_password) payload.erp_password = erp_password;
+
+        const res = await fetch(`/api/admin/students/${editingRollNo}`, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          showToast(`Student ${editingRollNo} updated successfully!`);
+          closeStudentModal();
+          fetchStudents();
+        }
+      } else {
+        const payload = {name, roll_no, email, telegram_chat_id, erp_password};
+        const res = await fetch('/api/admin/students', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(`Student ${roll_no} added successfully!`);
+          closeStudentModal();
+          fetchStudents();
+          fetchStats();
+        } else {
+          alert(data.detail || 'Failed to create student.');
+        }
+      }
+    } catch (err) {
+      alert('Error saving student.');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function handleAdminLogout() {
+    await fetch('/api/admin/logout', {method: 'POST'});
+    localStorage.removeItem('admin_token');
+    window.location.href = '/admin/login';
+  }
+</script>
+{% endblock %}

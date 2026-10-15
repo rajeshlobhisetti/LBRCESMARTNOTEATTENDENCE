@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# Environment Variables & Secrets (Keep private!)
+.env
+.env.local
+
+# Screenshots & Temporary scrapings
+*.png
+stored_attendance.json
+attendance_history.json
+
+# Logs & Task outputs
+*.log
+.system_generated/
+data/
+
+# OS specific
+.DS_Store
+Thumbs.db

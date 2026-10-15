@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Registration Successful &bull; LBRCE Attendance Alerts{% endblock %}
+
+{% block content %}
+<div class="py-16 px-4 sm:px-6 lg:px-8 max-w-2xl mx-auto text-center">
+  
+  <!-- Success Icon -->
+  <div class="w-20 h-20 mx-auto rounded-3xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/20 mb-6">
+    <i class="fa-solid fa-circle-check"></i>
+  </div>
+
+  <span class="inline-block px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-full mb-3">
+    🎉 Registration Complete
+  </span>
+
+  <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">
+    Welcome aboard, {{ name|default('Student') }}!
+  </h1>
+  <p class="mt-2 text-sm text-slate-600">
+    Roll Number: <strong class="font-mono text-slate-800">{{ roll_no }}</strong>
+  </p>
+
+  <!-- Notification cards -->
+  <div class="mt-8 bg-white rounded-2xl border border-slate-200 p-6 text-left shadow-sm space-y-4">
+    <div class="flex items-start space-x-3">
+      <span class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm shrink-0 mt-0.5">
+        <i class="fa-solid fa-envelope"></i>
+      </span>
+      <div>
+        <h3 class="text-sm font-bold text-slate-800">Email Notification Sent</h3>
+        <p class="text-xs text-slate-500 mt-0.5">A registration confirmation email has been dispatched to your email address.</p>
+      </div>
+    </div>
+
+    <div class="border-t border-slate-100 pt-4 flex items-start space-x-3">
+      <span class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm shrink-0 mt-0.5">
+        <i class="fa-brands fa-telegram"></i>
+      </span>
+      <div>
+        <h3 class="text-sm font-bold text-slate-800">Telegram Bot Activated</h3>
+        <p class="text-xs text-slate-500 mt-0.5">A welcome message has been delivered to your Telegram. You will now receive automatic reports twice daily at <strong>8:00 AM</strong> and <strong>8:00 PM</strong>.</p>
+      </div>
+    </div>
+
+    <div class="border-t border-slate-100 pt-4 flex items-start space-x-3">
+      <span class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-sm shrink-0 mt-0.5">
+        <i class="fa-solid fa-bolt"></i>
+      </span>
+      <div>
+        <h3 class="text-sm font-bold text-slate-800">Instant On-Demand Check</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Want to see your attendance right now? Simply send <code>/attendance</code> to the bot anytime!</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+    <a href="https://t.me/{{ bot_username|default('LBRCEattendancebot') }}" target="_blank"
+      class="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-500/25 transition flex items-center justify-center space-x-2">
+      <i class="fa-brands fa-telegram text-lg"></i>
+      <span>Open Telegram Bot</span>
+    </a>
+    <a href="/"
+      class="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl transition">
+      Back to Home
+    </a>
+  </div>
+
+</div>
+{% endblock %}

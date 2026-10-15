@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  attendance-platform:
+    build: .
+    container_name: lbrce-attendance-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    shm_size: 2gb
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data

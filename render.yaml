@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: lbrce-attendance-service
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: attendence
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        value: LBRCEattendancebot
+      - key: ERP_BASE_URL
+        value: https://erp.lbrce.ac.in
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MORNING_CRON_HOUR
+        value: "8"
+      - key: MORNING_CRON_MINUTE
+        value: "0"
+      - key: NIGHT_CRON_HOUR
+        value: "20"
+      - key: NIGHT_CRON_MINUTE
+        value: "0"
