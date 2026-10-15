@@ -7,13 +7,13 @@ services:
     region: oregon
     envVars:
       - key: PORT
-        value: 8000
+        value: "8000"
       - key: MONGODB_URI
-        sync: false
+        value: mongodb+srv://surya:surya@cluster0.vyreenm.mongodb.net/attendence?retryWrites=true&w=majority
       - key: DB_NAME
         value: attendence
       - key: TELEGRAM_BOT_TOKEN
-        sync: false
+        value: "8523038213:AAErnH_G_r4mnCH1wfgBe-JTTFNjDgdjwXs"
       - key: TELEGRAM_BOT_USERNAME
         value: LBRCEattendancebot
       - key: ERP_BASE_URL
@@ -21,7 +21,7 @@ services:
       - key: ADMIN_USERNAME
         value: admin
       - key: ADMIN_PASSWORD
-        sync: false
+        value: admin@lbrce2025
       - key: JWT_SECRET
         generateValue: true
       - key: MORNING_CRON_HOUR
