@@ -484,7 +484,7 @@
               <button onclick="inspectStudent('${s.roll_no}')" title="Inspect Subjects" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg">
                 <i class="fa-solid fa-eye"></i>
               </button>
-              <button onclick="triggerSingle('${s.roll_no}')" title="Scrape & Telegram Now" class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg">
+              <button onclick="triggerSingle('${s.roll_no}', this)" title="Scrape & Telegram Now" class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg">
                 <i class="fa-solid fa-bolt"></i>
               </button>
               <button onclick="openEditStudentModal('${s.roll_no}', '${s.name}', '${s.email}', '${s.telegram_chat_id}', ${s.is_active})" title="Edit" class="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg">
@@ -565,15 +565,33 @@
     document.getElementById('inspectModal').classList.add('hidden');
   }
 
-  async function triggerSingle(rollNo) {
-    showToast(`Triggering immediate scrape for ${rollNo}...`);
+  async function triggerSingle(rollNo, btn) {
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-amber-600"></i>';
+    }
+    showToast(`Scrape queued for ${rollNo}. Communicating with LBRCE ERP...`);
     try {
       const res = await fetch(`/api/admin/students/${rollNo}/trigger`, {method: 'POST'});
       const data = await res.json();
       showToast(data.message || 'Scrape initiated in background.');
-      setTimeout(() => { fetchStudents(); fetchStats(); }, 6000);
+      
+      // Auto refresh table and logs after scraping completes
+      setTimeout(async () => {
+        await fetchStudents();
+        await fetchStats();
+        await fetchLogs();
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-bolt"></i>';
+        }
+      }, 15000);
     } catch (e) {
       showToast('Error triggering scrape', 'error');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-bolt"></i>';
+      }
     }
   }
 
@@ -598,30 +616,27 @@
       });
       const data = await res.json();
       showToast(data.message || 'Batch scrape initiated for all active students.');
-
-      // Poll updates every 3 seconds
-      let pollCount = 0;
-      const interval = setInterval(() => {
-        fetchStudents();
-        fetchStats();
-        fetchLogs();
-        pollCount++;
-        if (pollCount >= 5) clearInterval(interval);
-      }, 3000);
-
-    } catch (e) {
-      showToast('Failed to trigger batch run: ' + e, 'error');
-    } finally {
-      setTimeout(() => {
+      setTimeout(async () => {
+        await fetchStudents();
+        await fetchStats();
+        await fetchLogs();
         if (btn1) {
           btn1.disabled = false;
-          btn1.innerHTML = '<i class="fa-solid fa-bolt mr-2"></i> Trigger Scrape for All Now';
+          btn1.innerHTML = '<i class="fa-solid fa-bolt mr-1.5"></i> Scrape All Active Students';
         }
         if (btn2) {
           btn2.disabled = false;
-          btn2.innerHTML = '<i class="fa-solid fa-play text-xs mr-2"></i> Scrape All Students Now';
+          btn2.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-2"></i> Trigger Batch Scrape All';
         }
-      }, 5000);
+      }, 20000);
+    } catch (e) {
+      showToast('Error triggering batch scrape', 'error');
+      if (btn1) {
+        btn1.disabled = false;
+        btn1.innerHTML = '<i class="fa-solid fa-bolt mr-1.5"></i> Scrape All Active Students';
+      }
+      if (btn2) {
+        btn2.disabled = false;
     }
   }
 
