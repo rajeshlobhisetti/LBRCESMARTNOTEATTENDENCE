@@ -1,17 +1,16 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
-from datetime import datetime
 
 class StudentRegisterRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=100, description="Full Name of the student")
     roll_no: str = Field(..., min_length=5, max_length=20, description="LBRCE Student Roll Number (ERP Username)")
-    email: EmailStr = Field(..., description="Student Email address for confirmation")
+    email: str = Field(..., min_length=5, max_length=150, description="Student Email address for confirmation")
     telegram_chat_id: str = Field(..., min_length=5, max_length=50, description="Telegram Chat ID")
     erp_password: str = Field(..., min_length=3, max_length=100, description="LBRCE ERP Login Password")
 
 class StudentUpdateRequest(BaseModel):
     name: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     telegram_chat_id: Optional[str] = None
     erp_password: Optional[str] = None
     is_active: Optional[bool] = None
