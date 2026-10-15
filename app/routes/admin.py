@@ -11,8 +11,11 @@ from app.scheduler import process_single_student, run_batch_attendance
 
 logger = logging.getLogger(__name__)
 
+from pathlib import Path
+
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
+TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin_root(request: Request):
@@ -26,7 +29,7 @@ async def admin_root(request: Request):
 
 @router.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
-    return templates.TemplateResponse("admin_login.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="admin_login.html")
 
 @router.post("/api/admin/login")
 async def api_admin_login(payload: AdminLoginRequest, response: Response):
@@ -61,9 +64,9 @@ async def admin_dashboard_page(request: Request):
         return RedirectResponse(url="/admin/login", status_code=302)
 
     return templates.TemplateResponse(
-        "admin_dashboard.html",
-        {
-            "request": request,
+        request=request,
+        name="admin_dashboard.html",
+        context={
             "admin_user": current_admin.get("username"),
             "bot_username": settings.TELEGRAM_BOT_USERNAME,
             "bot_token": settings.TELEGRAM_BOT_TOKEN

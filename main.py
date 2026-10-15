@@ -21,23 +21,39 @@ logger = logging.getLogger("lbrce-attendance")
 async def lifespan(app: FastAPI):
     # STARTUP
     logger.info("Initializing LBRCE Attendance Platform...")
-    db.connect()
-    
-    # Start Telegram Bot Polling
-    telegram_service.start_polling()
-    
-    # Start Cron Scheduler (8:00 AM & 8:00 PM)
-    start_scheduler()
-    
-    logger.info(f"Platform successfully started. Web portal ready at http://localhost:8000")
+    try:
+        db.connect()
+    except Exception as e:
+        logger.error(f"Database startup error: {e}")
+
+    try:
+        telegram_service.start_polling()
+    except Exception as e:
+        logger.error(f"Telegram service startup error: {e}")
+
+    try:
+        start_scheduler()
+    except Exception as e:
+        logger.error(f"Scheduler startup error: {e}")
+
+    logger.info("Platform successfully started.")
     yield
 
     # SHUTDOWN
     logger.info("Shutting down LBRCE Attendance Platform...")
-    telegram_service.stop_polling()
-    stop_scheduler()
+    try:
+        telegram_service.stop_polling()
+    except Exception:
+        pass
+    try:
+        stop_scheduler()
+    except Exception:
+        pass
     if db.client:
-        db.client.close()
+        try:
+            db.client.close()
+        except Exception:
+            pass
     logger.info("Shutdown complete.")
 
 app = FastAPI(
@@ -55,6 +71,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Healthcheck for Render & Uptime monitors
+@app.head("/")
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "service": "lbrce-attendance"}
 
 # Include Routers
 app.include_router(student.router)

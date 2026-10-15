@@ -12,15 +12,18 @@ from app.scraper import verify_credentials_quick
 
 logger = logging.getLogger(__name__)
 
+from pathlib import Path
+
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
+TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 @router.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request):
     return templates.TemplateResponse(
-        "register.html",
-        {
-            "request": request,
+        request=request,
+        name="register.html",
+        context={
             "bot_username": settings.TELEGRAM_BOT_USERNAME,
             "bot_token_preview": settings.TELEGRAM_BOT_TOKEN[:10] + "..."
         }
@@ -29,9 +32,9 @@ async def landing_page(request: Request):
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     return templates.TemplateResponse(
-        "register.html",
-        {
-            "request": request,
+        request=request,
+        name="register.html",
+        context={
             "bot_username": settings.TELEGRAM_BOT_USERNAME,
             "bot_token_preview": settings.TELEGRAM_BOT_TOKEN[:10] + "..."
         }
@@ -40,9 +43,9 @@ async def register_page(request: Request):
 @router.get("/register/success", response_class=HTMLResponse)
 async def register_success_page(request: Request, roll_no: str = "", name: str = ""):
     return templates.TemplateResponse(
-        "register_success.html",
-        {
-            "request": request,
+        request=request,
+        name="register_success.html",
+        context={
             "roll_no": roll_no,
             "name": name,
             "bot_username": settings.TELEGRAM_BOT_USERNAME
