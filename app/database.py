@@ -1,13 +1,11 @@
 import logging
+import bcrypt
 from pymongo import MongoClient, ASCENDING
 from pymongo.collection import Collection
-from passlib.context import CryptContext
 from datetime import datetime
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class Database:
     def __init__(self):
@@ -59,8 +57,10 @@ class Database:
             if self.admins is None:
                 return
             existing = self.admins.find_one({"username": settings.ADMIN_USERNAME})
+            pwd_bytes = settings.ADMIN_PASSWORD.encode("utf-8")[:72]
+            hashed = bcrypt.hashpw(pwd_bytes, bcrypt.gensalt()).decode("utf-8")
+
             if not existing:
-                hashed = pwd_context.hash(settings.ADMIN_PASSWORD)
                 self.admins.insert_one({
                     "username": settings.ADMIN_USERNAME,
                     "password_hash": hashed,
@@ -70,7 +70,12 @@ class Database:
                 })
                 logger.info(f"Default admin '{settings.ADMIN_USERNAME}' created.")
             else:
-                logger.info(f"Admin '{settings.ADMIN_USERNAME}' verified.")
+                # Update password hash with clean bcrypt hash to guarantee login
+                self.admins.update_one(
+                    {"username": settings.ADMIN_USERNAME},
+                    {"$set": {"password_hash": hashed}}
+                )
+                logger.info(f"Admin '{settings.ADMIN_USERNAME}' password hash verified.")
         except Exception as e:
             logger.warning(f"Could not seed admin: {e}")
 
