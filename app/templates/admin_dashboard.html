@@ -104,31 +104,35 @@
     </div>
 
     <!-- Schedule Info -->
-    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+    <div onclick="switchTab('scheduleTab')" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm cursor-pointer hover:border-amber-400 hover:shadow-md transition">
       <div class="flex items-center justify-between">
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Cron Schedule</span>
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Automatic Sync</span>
         <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm">
           <i class="fa-solid fa-clock"></i>
         </span>
       </div>
-      <p class="text-sm font-bold text-slate-900 mt-2">8:00 AM & 8:00 PM</p>
-      <p class="text-[11px] text-slate-500 mt-1">Automatic twice-daily run</p>
+      <p class="text-sm font-bold text-slate-900 mt-2 truncate" id="metricScheduleSummary">Loading...</p>
+      <p class="text-[11px] text-slate-500 mt-1 truncate" id="metricNextRun">Click to configure timings &rarr;</p>
     </div>
 
   </div>
 
   <!-- Tabs Navigation -->
   <div class="border-b border-slate-200 mb-6">
-    <nav class="flex space-x-6 text-sm font-semibold">
-      <button onclick="switchTab('studentsTab')" id="tabBtnStudents" class="pb-3 border-b-2 border-blue-600 text-blue-600 flex items-center space-x-2">
+    <nav class="flex space-x-6 text-sm font-semibold overflow-x-auto">
+      <button onclick="switchTab('studentsTab')" id="tabBtnStudents" class="pb-3 border-b-2 border-blue-600 text-blue-600 flex items-center space-x-2 shrink-0">
         <i class="fa-solid fa-user-group text-xs"></i>
         <span>Registered Students</span>
       </button>
-      <button onclick="switchTab('logsTab')" id="tabBtnLogs" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2">
+      <button onclick="switchTab('logsTab')" id="tabBtnLogs" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2 shrink-0">
         <i class="fa-solid fa-list-check text-xs"></i>
         <span>Scraping Logs & History</span>
       </button>
-      <button onclick="switchTab('settingsTab')" id="tabBtnSettings" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2">
+      <button onclick="switchTab('scheduleTab')" id="tabBtnSchedule" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2 shrink-0">
+        <i class="fa-solid fa-clock-rotate-left text-xs"></i>
+        <span>Schedule & Automation</span>
+      </button>
+      <button onclick="switchTab('settingsTab')" id="tabBtnSettings" class="pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2 shrink-0">
         <i class="fa-solid fa-gear text-xs"></i>
         <span>System & Bot Settings</span>
       </button>
@@ -224,7 +228,103 @@
     </div>
   </div>
 
-  <!-- TAB 3: SETTINGS -->
+  <!-- TAB 3: SCHEDULE MANAGEMENT -->
+  <div id="scheduleTab" class="hidden space-y-6">
+    
+    <!-- Header with IST clock & Next Run -->
+    <div class="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-2xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center space-x-2">
+          <span class="px-2.5 py-1 bg-amber-400 text-slate-950 font-black rounded-lg text-[10px] tracking-wider uppercase">IST Configured</span>
+          <span class="text-xs text-indigo-200">Asia/Kolkata (UTC +05:30)</span>
+        </div>
+        <h3 class="text-lg font-black text-white mt-2">Automatic Attendance Schedule</h3>
+        <p class="text-xs text-indigo-200 mt-1 max-w-xl">
+          Set the exact daily times when the system automatically scrapes LBRCE ERP for all active students and delivers Telegram alerts.
+        </p>
+      </div>
+
+      <div class="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10 text-right">
+        <p class="text-[11px] font-semibold text-indigo-300 uppercase tracking-wider">Live Server Time (IST)</p>
+        <p class="text-xl font-mono font-black text-amber-300 mt-0.5" id="liveIstClock">--:--:-- IST</p>
+        <p class="text-[10px] text-indigo-200 mt-1" id="nextUpcomingRunBanner">Next Run: Calculating...</p>
+      </div>
+    </div>
+
+    <!-- Active Schedules Grid / Form -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+        <div>
+          <h4 class="text-sm font-bold text-slate-900 flex items-center">
+            <i class="fa-solid fa-clock-rotate-left text-blue-600 mr-2"></i> Daily Automatic Trigger Timings
+          </h4>
+          <p class="text-xs text-slate-500 mt-0.5">Configure one or multiple daily sync triggers (24-hour format in IST)</p>
+        </div>
+        <button onclick="addScheduleRow()" 
+          class="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl transition border border-blue-200 flex items-center justify-center space-x-1.5 self-start sm:self-auto">
+          <i class="fa-solid fa-plus text-[10px]"></i>
+          <span>Add Another Trigger Time</span>
+        </button>
+      </div>
+
+      <!-- Schedule Rows Container -->
+      <div class="divide-y divide-slate-100 my-4" id="schedulesContainer">
+        <!-- Rendered via JavaScript -->
+        <div class="py-6 text-center text-slate-400 text-xs">
+          <i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Loading schedule settings...
+        </div>
+      </div>
+
+      <!-- Keep Alive Option -->
+      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-6">
+        <div>
+          <p class="text-xs font-bold text-slate-800 flex items-center">
+            <i class="fa-solid fa-heart-pulse text-rose-500 mr-2"></i> Render 24/7 Keep-Alive Heartbeat
+          </p>
+          <p class="text-[11px] text-slate-500 mt-0.5">
+            Pings the service every 10 minutes to prevent Render free-tier from idling/sleeping so scheduled runs execute without delay.
+          </p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="keepAliveCheckbox" class="sr-only peer" checked>
+          <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+        </label>
+      </div>
+
+      <!-- Save & Apply Button -->
+      <div class="pt-5 flex items-center justify-between border-t border-slate-100 mt-6">
+        <p class="text-[11px] text-slate-400">Timings apply immediately to the background scheduler upon saving.</p>
+        <button onclick="saveScheduleConfig(this)" id="saveScheduleBtn"
+          class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md shadow-blue-500/20 transition flex items-center space-x-2">
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span>Save & Apply Schedules</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Webhook Integration Card for Guaranteed 100% Uptime -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <div class="flex items-center space-x-2 text-slate-900 font-bold text-sm mb-1">
+        <i class="fa-solid fa-bolt-lightning text-amber-500"></i>
+        <h4>External Cron Webhook (Zero Sleep Guarantee)</h4>
+      </div>
+      <p class="text-xs text-slate-500 mb-4">
+        Render free tier spins down after 15 minutes of inactivity. For 100% guarantee that the sync runs at the exact minute even if the server is sleeping, you can paste this webhook URL into a free external monitor (such as <a href="https://cron-job.org" target="_blank" class="text-blue-600 underline font-semibold">cron-job.org</a> or <a href="https://uptimerobot.com" target="_blank" class="text-blue-600 underline font-semibold">UptimeRobot</a>):
+      </p>
+
+      <div class="flex items-center space-x-2">
+        <input type="text" id="webhookUrlInput" readonly
+          class="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-mono rounded-xl p-3 focus:outline-none">
+        <button onclick="copyWebhookUrl()" class="px-4 py-3 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shrink-0">
+          <i class="fa-solid fa-copy"></i>
+          <span>Copy</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TAB 4: SETTINGS -->
   <div id="settingsTab" class="hidden space-y-6">
     <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-2xl">
       <h3 class="text-base font-bold text-slate-900 mb-4 flex items-center">
@@ -373,35 +473,58 @@
 <script>
   let editingRollNo = null;
   let searchTimeout = null;
+  let currentSchedules = [];
 
   document.addEventListener('DOMContentLoaded', () => {
     fetchStats();
     fetchStudents();
     fetchLogs();
+    fetchScheduleConfig();
   });
 
+  function updateIstClock() {
+    try {
+      const now = new Date();
+      const istStr = now.toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour12: true,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      const el = document.getElementById('liveIstClock');
+      if (el) el.innerText = istStr + ' IST';
+    } catch (e) {}
+  }
+  setInterval(updateIstClock, 1000);
+
   function switchTab(tabId) {
-    ['studentsTab', 'logsTab', 'settingsTab'].forEach(id => {
-      document.getElementById(id).classList.add('hidden');
+    ['studentsTab', 'logsTab', 'scheduleTab', 'settingsTab'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
     });
-    document.getElementById(tabId).classList.remove('hidden');
+    const target = document.getElementById(tabId);
+    if (target) target.classList.remove('hidden');
 
     const btns = {
       studentsTab: 'tabBtnStudents',
       logsTab: 'tabBtnLogs',
+      scheduleTab: 'tabBtnSchedule',
       settingsTab: 'tabBtnSettings'
     };
 
     Object.keys(btns).forEach(key => {
       const btn = document.getElementById(btns[key]);
+      if (!btn) return;
       if (key === tabId) {
-        btn.className = 'pb-3 border-b-2 border-blue-600 text-blue-600 flex items-center space-x-2';
+        btn.className = 'pb-3 border-b-2 border-blue-600 text-blue-600 flex items-center space-x-2 shrink-0';
       } else {
-        btn.className = 'pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2';
+        btn.className = 'pb-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 flex items-center space-x-2 shrink-0';
       }
     });
 
     if (tabId === 'logsTab') fetchLogs();
+    if (tabId === 'scheduleTab') fetchScheduleConfig();
   }
 
   function showToast(message, type = 'success') {
@@ -423,9 +546,161 @@
       document.getElementById('metricAvgAttendance').innerText = data.average_attendance;
       document.getElementById('metricSuccessScrapes').innerText = data.today_success_scrapes;
       document.getElementById('metricFailedScrapes').innerText = `${data.today_failed_scrapes} failed`;
+      if (document.getElementById('metricScheduleSummary')) {
+        document.getElementById('metricScheduleSummary').innerText = data.schedules_summary || '08:00 & 20:00';
+      }
+      if (document.getElementById('metricNextRun')) {
+        document.getElementById('metricNextRun').innerText = `Next: ${data.next_scheduled_run || 'Calculating...'}`;
+      }
     } catch (e) {
       console.error(e);
     }
+  }
+
+  async function fetchScheduleConfig() {
+    try {
+      const res = await fetch('/api/admin/schedule');
+      if (res.status === 401) return;
+      const data = await res.json();
+
+      currentSchedules = data.schedules || [];
+      renderSchedulesList();
+
+      if (document.getElementById('keepAliveCheckbox')) {
+        document.getElementById('keepAliveCheckbox').checked = !!data.keep_alive_enabled;
+      }
+
+      if (document.getElementById('webhookUrlInput')) {
+        document.getElementById('webhookUrlInput').value = data.webhook_url || '';
+      }
+
+      if (data.next_runs && data.next_runs.length > 0) {
+        const next = data.next_runs[0];
+        const nextBanner = document.getElementById('nextUpcomingRunBanner');
+        if (nextBanner) {
+          nextBanner.innerText = `Next: ${next.next_run_ist} (${next.time_until})`;
+        }
+        const metricRun = document.getElementById('metricNextRun');
+        if (metricRun) {
+          metricRun.innerText = `Next: ${next.next_run_ist}`;
+        }
+      } else {
+        const nextBanner = document.getElementById('nextUpcomingRunBanner');
+        if (nextBanner) nextBanner.innerText = 'No upcoming runs scheduled (all paused)';
+      }
+    } catch (err) {
+      console.error('Error fetching schedule config:', err);
+    }
+  }
+
+  function renderSchedulesList() {
+    const container = document.getElementById('schedulesContainer');
+    if (!container) return;
+
+    if (!currentSchedules || currentSchedules.length === 0) {
+      container.innerHTML = '<div class="py-8 text-center text-slate-400 text-xs">No scheduled trigger times configured. Click "Add Another Trigger Time" above.</div>';
+      return;
+    }
+
+    container.innerHTML = currentSchedules.map((item, idx) => `
+      <div class="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
+        <div class="flex items-center space-x-3 w-full sm:w-auto">
+          <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold shrink-0">
+            ${idx + 1}
+          </span>
+          <div class="flex-1 sm:w-48">
+            <input type="text" value="${item.name || ''}" 
+              oninput="currentSchedules[${idx}].name = this.value"
+              placeholder="e.g. Morning Sync"
+              class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none">
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-4 self-end sm:self-auto">
+          <div class="flex items-center space-x-1.5">
+            <label class="text-[11px] font-bold text-slate-500 uppercase">IST Time:</label>
+            <input type="time" value="${item.time || '08:00'}" 
+              onchange="currentSchedules[${idx}].time = this.value"
+              class="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-800 focus:bg-white focus:outline-none">
+          </div>
+
+          <label class="relative inline-flex items-center cursor-pointer" title="Enable / Disable Sync">
+            <input type="checkbox" ${item.enabled ? 'checked' : ''} 
+              onchange="currentSchedules[${idx}].enabled = this.checked"
+              class="sr-only peer">
+            <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+          </label>
+
+          <button onclick="removeScheduleRow(${idx})" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition" title="Delete Schedule">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function addScheduleRow() {
+    const count = currentSchedules.length + 1;
+    currentSchedules.push({
+      id: 'custom_' + Date.now(),
+      name: `Sync Schedule ${count}`,
+      time: '12:00',
+      enabled: true
+    });
+    renderSchedulesList();
+  }
+
+  function removeScheduleRow(idx) {
+    currentSchedules.splice(idx, 1);
+    renderSchedulesList();
+  }
+
+  async function saveScheduleConfig(btn) {
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i> Saving...';
+    }
+
+    const keepAlive = document.getElementById('keepAliveCheckbox') ? document.getElementById('keepAliveCheckbox').checked : true;
+
+    try {
+      const res = await fetch('/api/admin/schedule', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          schedules: currentSchedules,
+          keep_alive_enabled: keepAlive
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || 'Schedule updated successfully!');
+        fetchScheduleConfig();
+        fetchStats();
+      } else {
+        showToast(data.detail || 'Failed to update schedule', 'error');
+      }
+    } catch (e) {
+      showToast('Error saving schedule configuration', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1.5"></i> <span>Save & Apply Schedules</span>';
+      }
+    }
+  }
+
+  function copyWebhookUrl() {
+    const input = document.getElementById('webhookUrlInput');
+    if (!input || !input.value) return;
+    navigator.clipboard.writeText(input.value).then(() => {
+      showToast('Cron Webhook URL copied to clipboard! Paste in cron-job.org or UptimeRobot.');
+    }).catch(() => {
+      input.select();
+      document.execCommand('copy');
+      showToast('Cron Webhook URL copied to clipboard!');
+    });
   }
 
   function debounceFetchStudents() {

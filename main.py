@@ -72,11 +72,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import zoneinfo
+from datetime import datetime
+
+IST_TZ = zoneinfo.ZoneInfo("Asia/Kolkata")
+
 # Healthcheck for Render & Uptime monitors
 @app.head("/")
 @app.get("/health")
+@app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "service": "lbrce-attendance"}
+    return {
+        "status": "ok",
+        "service": "lbrce-attendance",
+        "time_ist": datetime.now(IST_TZ).strftime("%d/%m/%Y %I:%M:%S %p IST")
+    }
 
 # Include Routers
 app.include_router(student.router)

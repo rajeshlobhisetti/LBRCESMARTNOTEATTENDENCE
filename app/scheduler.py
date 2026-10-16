@@ -1,7 +1,11 @@
+import os
 import logging
+import zoneinfo
+import requests
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from app.config import settings
 from app.database import db
 from app.scraper import scrape_student_attendance
@@ -9,7 +13,10 @@ from app.telegram_bot import telegram_service
 
 logger = logging.getLogger(__name__)
 
-scheduler = BackgroundScheduler()
+# Indian Standard Time (IST) Zone
+IST_TZ = zoneinfo.ZoneInfo("Asia/Kolkata")
+
+scheduler = BackgroundScheduler(timezone=IST_TZ)
 
 def process_single_student(student: dict, trigger_name: str) -> dict:
     """
@@ -110,13 +117,174 @@ def process_single_student(student: dict, trigger_name: str) -> dict:
 
         return {"roll_no": roll_no, "success": False, "error": err_msg}
 
-def scheduled_job_morning():
-    logger.info("⏰ Morning 8:00 AM Attendance Job Started")
-    run_batch_attendance("SCHEDULED_MORNING_8AM")
+DEFAULT_SCHEDULES = [
+    {"id": "morning", "name": "Morning Sync", "enabled": True, "time": "08:00"},
+    {"id": "evening", "name": "Evening Sync", "enabled": True, "time": "20:00"}
+]
 
-def scheduled_job_night():
-    logger.info("⏰ Night 8:00 PM Attendance Job Started")
-    run_batch_attendance("SCHEDULED_NIGHT_8PM")
+def get_scheduler_config() -> dict:
+    """
+    Retrieves current schedule configuration from MongoDB settings collection.
+    """
+    try:
+        if db.settings is not None:
+            conf = db.settings.find_one({"key": "scheduler_config"})
+            if conf:
+                return {
+                    "timezone": "Asia/Kolkata",
+                    "schedules": conf.get("schedules", DEFAULT_SCHEDULES),
+                    "keep_alive_enabled": conf.get("keep_alive_enabled", True)
+                }
+    except Exception as e:
+        logger.warning(f"Could not load scheduler config from DB: {e}")
+
+    return {
+        "timezone": "Asia/Kolkata",
+        "schedules": DEFAULT_SCHEDULES,
+        "keep_alive_enabled": True
+    }
+
+def save_scheduler_config(schedules: list, keep_alive_enabled: bool = True) -> dict:
+    """
+    Saves new schedule configuration to MongoDB and immediately reloads active scheduler jobs.
+    """
+    now_dt = datetime.utcnow()
+    config_doc = {
+        "key": "scheduler_config",
+        "timezone": "Asia/Kolkata",
+        "schedules": schedules,
+        "keep_alive_enabled": keep_alive_enabled,
+        "updated_at": now_dt
+    }
+
+    if db.settings is not None:
+        db.settings.update_one(
+            {"key": "scheduler_config"},
+            {"$set": config_doc},
+            upsert=True
+        )
+
+    # Immediately reload jobs with new timings in memory
+    reload_scheduler_jobs()
+    return config_doc
+
+def reload_scheduler_jobs():
+    """
+    Dynamically clears and registers cron jobs from MongoDB settings using Asia/Kolkata (IST).
+    """
+    conf = get_scheduler_config()
+    schedules = conf.get("schedules", DEFAULT_SCHEDULES)
+    keep_alive = conf.get("keep_alive_enabled", True)
+
+    # Remove existing sync jobs
+    for job in scheduler.get_jobs():
+        if job.id.startswith("cron_sync_"):
+            try:
+                scheduler.remove_job(job.id)
+            except Exception:
+                pass
+
+    registered = []
+    for item in schedules:
+        if not item.get("enabled", True):
+            continue
+
+        item_id = item.get("id", "custom")
+        job_id = f"cron_sync_{item_id}"
+        time_str = item.get("time", "08:00").strip()
+        name = item.get("name", f"Attendance Sync ({time_str})")
+
+        try:
+            parts = time_str.split(":")
+            h = int(parts[0])
+            m = int(parts[1]) if len(parts) > 1 else 0
+        except Exception:
+            h, m = 8, 0
+
+        # Closure generator for job action
+        def create_job_action(trigger_label):
+            def _action():
+                logger.info(f"⏰ Triggering scheduled attendance sync: {trigger_label}")
+                run_batch_attendance(trigger_label)
+            return _action
+
+        action_label = f"SCHEDULED_{name.upper().replace(' ', '_')}"
+        trigger = CronTrigger(hour=h, minute=m, timezone=IST_TZ)
+
+        scheduler.add_job(
+            create_job_action(action_label),
+            trigger=trigger,
+            id=job_id,
+            name=name,
+            replace_existing=True
+        )
+        registered.append({"id": job_id, "name": name, "time": f"{h:02d}:{m:02d} IST"})
+
+    # Setup or remove keep-alive self-ping (pings every 10 minutes to prevent Render free-tier sleep)
+    if keep_alive:
+        if not scheduler.get_job("keep_alive_ping_job"):
+            scheduler.add_job(
+                keep_alive_ping,
+                trigger=IntervalTrigger(minutes=10),
+                id="keep_alive_ping_job",
+                name="Render Free Tier Keep-Alive",
+                replace_existing=True
+            )
+            logger.info("Keep-alive 10-minute heartbeat enabled to prevent Render from sleeping.")
+    else:
+        if scheduler.get_job("keep_alive_ping_job"):
+            scheduler.remove_job("keep_alive_ping_job")
+
+    logger.info(f"Scheduler updated. Active IST Cron Jobs: {registered}")
+
+def get_next_run_times() -> list:
+    """
+    Returns human-readable next fire times in IST for all active scheduled jobs.
+    """
+    now_ist = datetime.now(IST_TZ)
+    jobs_info = []
+
+    for job in scheduler.get_jobs():
+        if job.id.startswith("cron_sync_"):
+            next_fire = getattr(job, "next_run_time", None)
+            if not next_fire and hasattr(job, "trigger"):
+                try:
+                    next_fire = job.trigger.get_next_fire_time(None, now_ist)
+                except Exception:
+                    next_fire = None
+
+            if next_fire:
+                # Convert next_fire to IST if not already
+                if next_fire.tzinfo is None:
+                    next_fire = next_fire.replace(tzinfo=IST_TZ)
+                else:
+                    next_fire = next_fire.astimezone(IST_TZ)
+
+                diff = (next_fire - now_ist).total_seconds()
+                hours = int(diff // 3600)
+                mins = int((diff % 3600) // 60)
+                time_left = f"in {hours}h {mins}m" if hours > 0 else f"in {mins}m"
+
+                jobs_info.append({
+                    "job_id": job.id,
+                    "name": job.name,
+                    "next_run_ist": next_fire.strftime("%d %b %Y, %I:%M %p IST"),
+                    "time_until": time_left
+                })
+
+    return jobs_info
+
+def keep_alive_ping():
+    """
+    Pings the application health endpoint every 10 minutes to prevent Render from going to sleep.
+    """
+    try:
+        public_url = os.getenv("RENDER_EXTERNAL_URL") or "https://lbrcesmartnoteattendence-1.onrender.com"
+        target = f"{public_url.rstrip('/')}/api/health"
+        r = requests.get(target, timeout=10)
+        logger.debug(f"Keep-alive self-ping response: {r.status_code}")
+    except Exception as e:
+        logger.debug(f"Keep-alive ping notice: {e}")
 
 def run_batch_attendance(trigger_name: str) -> dict:
     """
@@ -145,27 +313,9 @@ def run_batch_attendance(trigger_name: str) -> dict:
 
 def start_scheduler():
     if not scheduler.running:
-        # Morning trigger: 8:00 AM
-        scheduler.add_job(
-            scheduled_job_morning,
-            trigger=CronTrigger(hour=settings.MORNING_CRON_HOUR, minute=settings.MORNING_CRON_MINUTE),
-            id="morning_attendance_job",
-            replace_existing=True
-        )
-
-        # Night trigger: 8:00 PM (20:00)
-        scheduler.add_job(
-            scheduled_job_night,
-            trigger=CronTrigger(hour=settings.NIGHT_CRON_HOUR, minute=settings.NIGHT_CRON_MINUTE),
-            id="night_attendance_job",
-            replace_existing=True
-        )
-
         scheduler.start()
-        logger.info(
-            f"Scheduler started with triggers at 8:00 AM "
-            f"and 8:00 PM (20:00) daily."
-        )
+        reload_scheduler_jobs()
+        logger.info("BackgroundScheduler initialized and running in Asia/Kolkata (IST).")
 
 def stop_scheduler():
     if scheduler.running:

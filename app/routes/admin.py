@@ -1,5 +1,9 @@
+import os
 import logging
+import zoneinfo
+from typing import List, Optional
 from datetime import datetime
+from pydantic import BaseModel
 from fastapi import APIRouter, Request, Response, HTTPException, status, Depends, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -7,7 +11,14 @@ from app.models import AdminLoginRequest, StudentRegisterRequest, StudentUpdateR
 from app.database import db
 from app.config import settings
 from app.auth import verify_password, get_password_hash, create_access_token, get_current_admin
-from app.scheduler import process_single_student, run_batch_attendance
+from app.scheduler import (
+    process_single_student,
+    run_batch_attendance,
+    get_scheduler_config,
+    save_scheduler_config,
+    get_next_run_times,
+    IST_TZ
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +109,12 @@ async def get_admin_stats(current_admin: dict = Depends(get_current_admin)):
 
     calculated_avg = f"{(avg_pct / valid_count):.2f}%" if valid_count > 0 else "0.0%"
 
-    # Recent log counts
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_success = db.logs.count_documents({"timestamp": {"$gte": today_start}, "status": "SUCCESS"})
-    today_failed = db.logs.count_documents({"timestamp": {"$gte": today_start}, "status": "FAILED"})
+    config = get_scheduler_config()
+    next_runs = get_next_run_times()
+    schedules = config.get("schedules", [])
+    active_scheds = [f"{s.get('time')} ({s.get('name')})" for s in schedules if s.get("enabled", True)]
+    schedule_summary = ", ".join(active_scheds) if active_scheds else "None"
+    next_run_str = next_runs[0]["next_run_ist"] if next_runs else "None"
 
     return {
         "total_students": total_students,
@@ -109,8 +122,9 @@ async def get_admin_stats(current_admin: dict = Depends(get_current_admin)):
         "average_attendance": calculated_avg,
         "today_success_scrapes": today_success,
         "today_failed_scrapes": today_failed,
-        "morning_schedule": f"{settings.MORNING_CRON_HOUR:02d}:{settings.MORNING_CRON_MINUTE:02d} AM",
-        "night_schedule": f"{settings.NIGHT_CRON_HOUR:02d}:{settings.NIGHT_CRON_MINUTE:02d} PM"
+        "schedules_summary": schedule_summary,
+        "next_scheduled_run": next_run_str,
+        "server_time_ist": datetime.now(IST_TZ).strftime("%I:%M %p IST")
     }
 
 @router.get("/api/admin/students")
@@ -282,3 +296,67 @@ async def get_admin_logs(limit: int = 50, current_admin: dict = Depends(get_curr
             "timestamp": l.get("timestamp").strftime("%d/%m/%Y %I:%M:%S %p") if l.get("timestamp") else ""
         })
     return {"logs": formatted}
+
+# ----------------- SCHEDULE MANAGEMENT APIS -----------------
+
+class ScheduleItemModel(BaseModel):
+    id: str
+    name: str
+    time: str  # "HH:MM" 24hr format
+    enabled: bool = True
+
+class UpdateScheduleRequest(BaseModel):
+    schedules: List[ScheduleItemModel]
+    keep_alive_enabled: bool = True
+
+@router.get("/api/admin/schedule")
+async def get_schedule_settings_endpoint(current_admin: dict = Depends(get_current_admin)):
+    config = get_scheduler_config()
+    next_runs = get_next_run_times()
+    now_ist = datetime.now(IST_TZ)
+    public_url = os.getenv("RENDER_EXTERNAL_URL") or "https://lbrcesmartnoteattendence-1.onrender.com"
+    cron_token = settings.JWT_SECRET[:16]
+
+    return {
+        "timezone": "Asia/Kolkata (IST)",
+        "current_time_ist": now_ist.strftime("%d %b %Y, %I:%M:%S %p IST"),
+        "schedules": config.get("schedules", []),
+        "keep_alive_enabled": config.get("keep_alive_enabled", True),
+        "next_runs": next_runs,
+        "webhook_url": f"{public_url.rstrip('/')}/api/cron/sync?token={cron_token}",
+        "cron_token": cron_token
+    }
+
+@router.post("/api/admin/schedule")
+async def update_schedule_settings_endpoint(
+    payload: UpdateScheduleRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    schedules_dict = [s.model_dump() for s in payload.schedules]
+    save_scheduler_config(schedules_dict, payload.keep_alive_enabled)
+    next_runs = get_next_run_times()
+
+    active_count = sum(1 for s in schedules_dict if s.get("enabled", True))
+    return {
+        "success": True,
+        "message": f"Successfully updated schedule! {active_count} active sync time(s) registered in IST.",
+        "next_runs": next_runs
+    }
+
+@router.api_route("/api/cron/sync", methods=["GET", "POST"])
+async def trigger_cron_sync(background_tasks: BackgroundTasks, token: str = ""):
+    """
+    Public webhook endpoint that can be called by external cron services
+    (e.g., cron-job.org or UptimeRobot) to trigger attendance sync at scheduled times.
+    """
+    expected = settings.JWT_SECRET[:16]
+    if token != expected and token != settings.JWT_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid cron token.")
+
+    background_tasks.add_task(run_batch_attendance, "EXTERNAL_CRON_WEBHOOK")
+    return {
+        "success": True,
+        "message": "Batch attendance sync triggered via cron webhook.",
+        "triggered_at_ist": datetime.now(IST_TZ).strftime("%d/%m/%Y %I:%M:%S %p IST")
+    }
+
