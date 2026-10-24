@@ -161,6 +161,7 @@ async def get_all_students(
             "last_scraped_at": s.get("last_scraped_at").strftime("%d/%m/%Y %I:%M %p") if s.get("last_scraped_at") else None,
             "last_error": s.get("last_error"),
             "last_absences": s.get("last_absences", []),
+            "last_presents": s.get("last_presents", []),
             "subjects_count": len(s.get("last_attendance_data", []))
         })
     return {"students": results}
@@ -181,6 +182,7 @@ async def get_student_details(roll_no: str, current_admin: dict = Depends(get_cu
             "triggered_by": l.get("triggered_by"),
             "error_message": l.get("error_message"),
             "absences": l.get("absences", []),
+            "presents": l.get("presents", []),
             "timestamp": l.get("timestamp").strftime("%d/%m/%Y %I:%M %p") if l.get("timestamp") else ""
         })
 
@@ -194,6 +196,8 @@ async def get_student_details(roll_no: str, current_admin: dict = Depends(get_cu
             "last_overall_percentage": student.get("last_overall_percentage"),
             "last_scraped_at": student.get("last_scraped_at").strftime("%d/%m/%Y %I:%M %p") if student.get("last_scraped_at") else None,
             "last_error": student.get("last_error"),
+            "last_absences": student.get("last_absences", []),
+            "last_presents": student.get("last_presents", []),
             "subjects": student.get("last_attendance_data", [])
         },
         "logs": formatted_logs
@@ -293,6 +297,9 @@ async def get_admin_logs(limit: int = 50, current_admin: dict = Depends(get_curr
             "triggered_by": l.get("triggered_by"),
             "error_message": l.get("error_message"),
             "absences_count": len(l.get("absences", [])),
+            "presents_count": len(l.get("presents", [])),
+            "absences": l.get("absences", []),
+            "presents": l.get("presents", []),
             "timestamp": l.get("timestamp").strftime("%d/%m/%Y %I:%M:%S %p") if l.get("timestamp") else ""
         })
     return {"logs": formatted}

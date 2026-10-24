@@ -42,7 +42,8 @@ def process_single_student(student: dict, trigger_name: str) -> dict:
                     "last_scraped_at": now_dt,
                     "last_overall_percentage": result["overall_percentage"],
                     "last_attendance_data": result["subjects"],
-                    "last_absences": result["absences"],
+                    "last_absences": result.get("absences", []),
+                    "last_presents": result.get("presents", []),
                     "last_error": None
                 }
             }
@@ -58,7 +59,8 @@ def process_single_student(student: dict, trigger_name: str) -> dict:
                     "status": "SUCCESS",
                     "overall_percentage": result["overall_percentage"],
                     "subjects_count": len(result["subjects"]),
-                    "absences": result["absences"],
+                    "absences": result.get("absences", []),
+                    "presents": result.get("presents", []),
                     "triggered_by": trigger_name,
                     "error_message": None,
                     "timestamp": now_dt
@@ -74,7 +76,8 @@ def process_single_student(student: dict, trigger_name: str) -> dict:
                 roll_no=roll_no,
                 overall_percentage=result["overall_percentage"],
                 subjects=result["subjects"],
-                absences=result["absences"]
+                absences=result.get("absences", []),
+                presents=result.get("presents", [])
             )
             telegram_service.send_message(chat_id, msg)
 

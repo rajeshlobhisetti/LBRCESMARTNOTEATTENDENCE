@@ -112,28 +112,45 @@ def parse_attendance_html(html: str) -> Tuple[List[Dict[str, Any]], str]:
 def compare_attendance_records(
     current: List[Dict[str, Any]],
     previous: Optional[List[Dict[str, Any]]]
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
-    Compares current attendance with previously stored attendance to identify newly missed classes.
+    Compares current attendance with previously stored attendance to identify:
+    1. Newly missed classes (absences)
+    2. Newly attended classes (newly present)
     """
     absences = []
+    presents = []
     if not previous:
-        return absences
+        return absences, presents
 
     for curr in current:
         subj_name = curr.get("subject")
+        curr_held = curr.get("held", 0)
+        curr_present = curr.get("present", 0)
+        curr_pct = curr.get("percentage", "N/A")
+
         prev = next((p for p in previous if p.get("subject") == subj_name), None)
 
         if prev:
             prev_held = prev.get("held", 0)
             prev_present = prev.get("present", 0)
-            curr_held = curr.get("held", 0)
-            curr_present = curr.get("present", 0)
 
             held_diff = curr_held - prev_held
             present_diff = curr_present - prev_present
 
-            # Case 1: More classes were conducted than attended (Absence occurred)
+            # Case 1: Newly attended class(es)
+            if present_diff > 0:
+                presents.append({
+                    "subject": subj_name,
+                    "classes_attended": present_diff,
+                    "before_held": prev_held,
+                    "before_present": prev_present,
+                    "now_held": curr_held,
+                    "now_present": curr_present,
+                    "percentage": curr_pct
+                })
+
+            # Case 2: More classes were conducted than attended (Absence occurred)
             if held_diff > 0 and held_diff > present_diff:
                 missed = held_diff - max(0, present_diff)
                 absences.append({
@@ -142,9 +159,10 @@ def compare_attendance_records(
                     "before_present": prev_present,
                     "now_held": curr_held,
                     "now_present": curr_present,
-                    "classes_missed": missed
+                    "classes_missed": missed,
+                    "percentage": curr_pct
                 })
-            # Case 2: Present count decreased (marked absent after retrospective correction)
+            # Case 3: Present count decreased (marked absent after retrospective correction)
             elif curr_present < prev_present:
                 absences.append({
                     "subject": subj_name,
@@ -152,10 +170,33 @@ def compare_attendance_records(
                     "before_present": prev_present,
                     "now_held": curr_held,
                     "now_present": curr_present,
-                    "classes_missed": prev_present - curr_present
+                    "classes_missed": prev_present - curr_present,
+                    "percentage": curr_pct
+                })
+        else:
+            # Subject was newly introduced
+            if curr_present > 0:
+                presents.append({
+                    "subject": subj_name,
+                    "classes_attended": curr_present,
+                    "before_held": 0,
+                    "before_present": 0,
+                    "now_held": curr_held,
+                    "now_present": curr_present,
+                    "percentage": curr_pct
+                })
+            if curr_held > curr_present:
+                absences.append({
+                    "subject": subj_name,
+                    "before_held": 0,
+                    "before_present": 0,
+                    "now_held": curr_held,
+                    "now_present": curr_present,
+                    "classes_missed": curr_held - curr_present,
+                    "percentage": curr_pct
                 })
 
-    return absences
+    return absences, presents
 
 def scrape_student_attendance(
     roll_no: str,
@@ -228,7 +269,8 @@ def scrape_student_attendance(
                     "error": "Failed to load attendance view from ERP. Button not found or session expired.",
                     "overall_percentage": "N/A",
                     "subjects": [],
-                    "absences": []
+                    "absences": [],
+                    "presents": []
                 }
 
             # Parse table
@@ -240,19 +282,21 @@ def scrape_student_attendance(
                     "error": "Attendance data table not found in ERP response.",
                     "overall_percentage": overall_percentage,
                     "subjects": [],
-                    "absences": []
+                    "absences": [],
+                    "presents": []
                 }
 
             # Compare with previous
-            absences = compare_attendance_records(subjects, previous_attendance)
+            absences, presents = compare_attendance_records(subjects, previous_attendance)
 
-            logger.info(f"Successfully scraped attendance for {roll_no}: {overall_percentage}, {len(subjects)} subjects")
+            logger.info(f"Successfully scraped attendance for {roll_no}: {overall_percentage}, {len(subjects)} subjects, {len(presents)} presents, {len(absences)} absences")
             return {
                 "success": True,
                 "error": None,
                 "overall_percentage": overall_percentage,
                 "subjects": subjects,
-                "absences": absences
+                "absences": absences,
+                "presents": presents
             }
 
         except Exception as e:
@@ -262,7 +306,8 @@ def scrape_student_attendance(
                 "error": str(e),
                 "overall_percentage": "N/A",
                 "subjects": [],
-                "absences": []
+                "absences": [],
+                "presents": []
             }
         finally:
             if driver:

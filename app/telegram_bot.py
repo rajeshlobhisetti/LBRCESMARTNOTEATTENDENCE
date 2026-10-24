@@ -51,42 +51,71 @@ class TelegramBotService:
         overall_percentage: str,
         subjects: List[Dict[str, Any]],
         absences: Optional[List[Dict[str, Any]]] = None,
+        presents: Optional[List[Dict[str, Any]]] = None,
         note: Optional[str] = None
     ) -> str:
         """
         Formats attendance data into a clean, readable Telegram message.
-        Prominently highlights absentee warnings when missed classes are detected.
+        Prominently highlights both newly attended (present) classes and newly missed (absent) classes.
         """
         now = datetime.now().strftime("%d/%m/%Y %I:%M %p")
+        has_absences = bool(absences and len(absences) > 0)
+        has_presents = bool(presents and len(presents) > 0)
 
-        if absences and len(absences) > 0:
-            total_missed = sum(ab.get('classes_missed', 1) for ab in absences)
+        total_missed = sum(ab.get('classes_missed', 1) for ab in absences) if has_absences else 0
+        total_attended = sum(pr.get('classes_attended', 1) for pr in presents) if has_presents else 0
+
+        # Header section
+        if has_absences and has_presents:
+            msg = "🔔🔔 *ATTENDANCE UPDATE DETECTED!* 🔔🔔\n"
+            msg += f"✅ *Present in:* +{total_attended} newly attended class(es)\n"
+            msg += f"⚠️ *Absent in:* {total_missed} newly missed class(es)\n\n"
+        elif has_absences:
             msg = "🚨🚨 *ATTENDANCE WARNING: ABSENCE DETECTED!* 🚨🚨\n"
             msg += f"⚠️ *You were marked ABSENT in {total_missed} class(es)!*\n\n"
-            msg += f"👤 Student: *{name}* (`{roll_no}`)\n"
-            msg += f"🕐 Time: {now}\n"
-            msg += f"📉 Overall Attendance: *{overall_percentage}*\n"
+        elif has_presents:
+            msg = "🎉🎉 *ATTENDANCE UPDATE: NEW PRESENT CLASSES!* 🎉🎉\n"
+            msg += f"✅ *You were marked PRESENT in +{total_attended} new class(es)!*\n\n"
+        else:
+            msg = "📊 *LBRCE ATTENDANCE REPORT*\n"
+            msg += "✅ *Attendance Up to Date (No Changes)*\n\n"
+
+        msg += f"👤 Student: *{name}* (`{roll_no}`)\n"
+        msg += f"🕐 Time: {now}\n"
+        msg += f"📈 Overall Attendance: *{overall_percentage}*\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+        # Newly Attended / Present Classes Details
+        if has_presents:
+            msg += "🟢 *NEWLY ATTENDED / PRESENT CLASSES:*\n\n"
+            for pr in presents:
+                sname = pr.get('subject', 'Subject')
+                attended = pr.get('classes_attended', 1)
+                before_att = f"{pr.get('before_present')}/{pr.get('before_held')}"
+                now_att = f"{pr.get('now_present')}/{pr.get('now_held')}"
+                pct = pr.get('percentage', '')
+                pct_str = f" ({pct})" if pct else ""
+                msg += f"✅ *{sname}*\n"
+                msg += f"   • ➕ *Attended: +{attended} class(es)*\n"
+                msg += f"   • Attendance: {before_att} ➔ *{now_att}*{pct_str}\n\n"
             msg += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
-            msg += "🔴 *MISSED CLASSES DETAILS:*\n\n"
+        # Newly Missed / Absent Classes Details
+        if has_absences:
+            msg += "🔴 *MISSED CLASSES DETAILS (ABSENCES):*\n\n"
             for ab in absences:
                 sname = ab.get('subject', 'Subject')
                 missed = ab.get('classes_missed', 1)
                 before_att = f"{ab.get('before_present')}/{ab.get('before_held')}"
                 now_att = f"{ab.get('now_present')}/{ab.get('now_held')}"
+                pct = ab.get('percentage', '')
+                pct_str = f" ({pct})" if pct else ""
                 msg += f"⚠️ *{sname}*\n"
-                msg += f"   • Attendance: {before_att} ➔ *{now_att}*\n"
-                msg += f"   • ❌ *Missed: {missed} class(es)*\n\n"
-
-            msg += "━━━━━━━━━━━━━━━━━━━━━━\n"
-        else:
-            msg = "📊 *LBRCE ATTENDANCE REPORT*\n"
-            msg += "✅ *No New Absences Detected*\n\n"
-            msg += f"👤 Student: *{name}* (`{roll_no}`)\n"
-            msg += f"🕐 Time: {now}\n"
-            msg += f"📈 Overall Attendance: *{overall_percentage}*\n"
+                msg += f"   • ❌ *Missed: {missed} class(es)*\n"
+                msg += f"   • Attendance: {before_att} ➔ *{now_att}*{pct_str}\n\n"
             msg += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
+        # Subject-wise Breakdown Table
         if subjects:
             msg += "📋 *CURRENT SUBJECT-WISE BREAKDOWN:*\n\n"
             for subj in subjects:
@@ -112,7 +141,7 @@ class TelegramBotService:
         if note:
             msg += f"{note}\n"
 
-        msg += "🔔 _Automated updates sent daily at 8:00 AM & 8:00 PM._"
+        msg += "🔔 _Automated updates sent as per configured schedule._"
         return msg
 
     def handle_command(self, chat_id: str, username: str, text: str):
@@ -179,6 +208,8 @@ class TelegramBotService:
                             "last_scraped_at": now_dt,
                             "last_overall_percentage": result["overall_percentage"],
                             "last_attendance_data": result["subjects"],
+                            "last_absences": result.get("absences", []),
+                            "last_presents": result.get("presents", []),
                             "last_error": None
                         }
                     }
@@ -194,7 +225,8 @@ class TelegramBotService:
                             "status": "SUCCESS",
                             "overall_percentage": result["overall_percentage"],
                             "subjects_count": len(result["subjects"]),
-                            "absences": result["absences"],
+                            "absences": result.get("absences", []),
+                            "presents": result.get("presents", []),
                             "triggered_by": "TELEGRAM_USER",
                             "error_message": None,
                             "timestamp": now_dt
@@ -208,7 +240,8 @@ class TelegramBotService:
                     roll_no=student["roll_no"],
                     overall_percentage=result["overall_percentage"],
                     subjects=result["subjects"],
-                    absences=result["absences"]
+                    absences=result.get("absences", []),
+                    presents=result.get("presents", [])
                 )
                 self.send_message(chat_id, msg)
             else:

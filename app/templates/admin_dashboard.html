@@ -741,6 +741,11 @@
                 <span class="px-2 py-0.5 rounded-md font-bold text-[11px] ${badgeColor}">
                   ${attPct}
                 </span>
+                ${s.last_presents && s.last_presents.length > 0 ? `
+                  <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300" title="${s.last_presents.map(p => p.subject + ': +' + (p.classes_attended || 1) + ' attended').join(', ')}">
+                    🟢 +${s.last_presents.reduce((acc, p) => acc + (p.classes_attended || 1), 0)} Present
+                  </span>
+                ` : ''}
                 ${s.last_absences && s.last_absences.length > 0 ? `
                   <span class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-rose-100 text-rose-800 border border-rose-300 animate-pulse" title="${s.last_absences.map(a => a.subject + ': ' + a.classes_missed + ' missed').join(', ')}">
                     🚨 ${s.last_absences.length} Absences
@@ -786,20 +791,32 @@
         tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-400">No logs recorded yet.</td></tr>';
         return;
       }
-      tbody.innerHTML = data.logs.map(l => `
-        <tr class="hover:bg-slate-50/80 transition">
-          <td class="py-2.5 px-4 text-slate-500 whitespace-nowrap">${l.timestamp}</td>
-          <td class="py-2.5 px-4 font-mono font-bold text-slate-800">${l.roll_no}</td>
-          <td class="py-2.5 px-4 text-slate-600">${l.triggered_by}</td>
-          <td class="py-2.5 px-4">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${l.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
-              ${l.status}
-            </span>
-          </td>
-          <td class="py-2.5 px-4 font-bold text-slate-700">${l.overall_percentage || '--'}</td>
-          <td class="py-2.5 px-4 text-slate-500 max-w-xs truncate">${l.error_message || (l.absences_count ? `⚠️ ${l.absences_count} absence(s)` : '✅ Up to date')}</td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = data.logs.map(l => {
+        let detailsHtml = '✅ Up to date';
+        if (l.error_message) {
+          detailsHtml = `<span class="text-rose-600">${l.error_message}</span>`;
+        } else {
+          const parts = [];
+          if (l.presents_count > 0) parts.push(`🟢 +${l.presents_count} present(s)`);
+          if (l.absences_count > 0) parts.push(`⚠️ ${l.absences_count} absence(s)`);
+          if (parts.length > 0) detailsHtml = parts.join(' | ');
+        }
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-2.5 px-4 text-slate-500 whitespace-nowrap">${l.timestamp}</td>
+            <td class="py-2.5 px-4 font-mono font-bold text-slate-800">${l.roll_no}</td>
+            <td class="py-2.5 px-4 text-slate-600">${l.triggered_by}</td>
+            <td class="py-2.5 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${l.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                ${l.status}
+              </span>
+            </td>
+            <td class="py-2.5 px-4 font-bold text-slate-700">${l.overall_percentage || '--'}</td>
+            <td class="py-2.5 px-4 text-slate-600 max-w-xs truncate">${detailsHtml}</td>
+          </tr>
+        `;
+      }).join('');
     } catch (e) {
       tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-rose-500">Failed to load logs.</td></tr>';
     }
