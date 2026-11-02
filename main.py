@@ -36,6 +36,45 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Scheduler startup error: {e}")
 
+    # Dispatch one-time maintenance notice to students from cloud server
+    import threading
+    def _dispatch_maintenance_startup():
+        import time
+        from datetime import datetime
+        time.sleep(5)  # wait for services to settle
+        try:
+            if db.settings is not None:
+                notice_key = "maintenance_notice_20261102"
+                already_sent = db.settings.find_one({"key": notice_key})
+                if not already_sent:
+                    notice_msg = (
+                        "📢 *LBRCE Attendance Bot Notice*\n\n"
+                        "Dear Student,\n"
+                        "Our attendance server is currently under maintenance. We will get back to you soon!\n\n"
+                        "🛠️ *Our technical team is working on that.* Thank you for your patience."
+                    )
+                    students = list(db.students.find({"is_active": {"$ne": False}}))
+                    count = 0
+                    for st in students:
+                        cid = st.get("telegram_chat_id")
+                        if cid:
+                            try:
+                                if telegram_service.send_message(cid, notice_msg):
+                                    count += 1
+                                time.sleep(0.08)
+                            except Exception as ex:
+                                logger.warning(f"Maintenance message failed for {st.get('roll_no')}: {ex}")
+                    db.settings.update_one(
+                        {"key": notice_key},
+                        {"$set": {"key": notice_key, "sent_count": count, "sent_at": datetime.utcnow()}},
+                        upsert=True
+                    )
+                    logger.info(f"Delivered maintenance message to {count}/{len(students)} active students via Telegram.")
+        except Exception as e:
+            logger.warning(f"Startup maintenance dispatch error: {e}")
+
+    threading.Thread(target=_dispatch_maintenance_startup, daemon=True).start()
+
     logger.info("Platform successfully started.")
     yield
 

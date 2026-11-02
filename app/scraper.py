@@ -63,11 +63,17 @@ def parse_attendance_html(html: str) -> Tuple[List[Dict[str, Any]], str]:
     overall_percentage = "N/A"
 
     # Extract overall percentage
-    overall_label = soup.find(string=lambda t: t and "Overall(%) :" in t)
+    overall_label = soup.find(string=lambda t: t and ("overall(%)" in t.lower().replace(" ", "") or "overall%" in t.lower()))
     if overall_label:
         parent = overall_label.find_next()
         if parent:
             overall_percentage = parent.get_text(strip=True)
+    if overall_percentage == "N/A":
+        # Fallback regex search for Overall percentage
+        import re
+        m = re.search(r'Overall\s*\(?%\)?\s*:\s*([0-9.]+\s*%)', html, re.IGNORECASE)
+        if m:
+            overall_percentage = m.group(1).strip()
 
     # Find attendance table
     tables = soup.find_all("table")
@@ -255,31 +261,74 @@ def scrape_student_attendance(
             driver.get(history_url)
             time.sleep(3)
 
-            # Click attendance button
-            try:
-                att_btn = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.NAME, "ctl00$ContentPlaceHolder1$btnAtt"))
-                )
-                att_btn.click()
-                time.sleep(4)
-            except Exception as e:
-                logger.error(f"Could not click attendance button for {roll_no}: {e}")
+            # Locate Attendance button using multiple resilient selectors
+            att_btn = None
+            button_selectors = [
+                (By.NAME, "ctl00$ContentPlaceHolder1$btnAtt"),
+                (By.ID, "ContentPlaceHolder1_btnAtt"),
+                (By.XPATH, "//input[@value='Attendance' or contains(@name, 'btnAtt') or contains(@id, 'btnAtt')]"),
+                (By.XPATH, "//button[contains(., 'Attendance')]")
+            ]
+
+            for by_type, selector in button_selectors:
+                try:
+                    elements = driver.find_elements(by_type, selector)
+                    if elements:
+                        att_btn = elements[0]
+                        break
+                except Exception:
+                    continue
+
+            if not att_btn:
+                logger.error(f"Attendance button not found on StudentHistory page for {roll_no}")
                 return {
                     "success": False,
-                    "error": "Failed to load attendance view from ERP. Button not found or session expired.",
+                    "error": "Failed to load attendance view from ERP. Attendance button not found or session expired.",
                     "overall_percentage": "N/A",
                     "subjects": [],
                     "absences": [],
                     "presents": []
                 }
 
-            # Parse table
-            subjects, overall_percentage = parse_attendance_html(driver.page_source)
+            # Scroll button into view and click using JavaScript to trigger ASP.NET partial postback reliably
+            try:
+                driver.execute_script("arguments[0].scrollIntoView(true); arguments[0].click();", att_btn)
+                logger.info(f"Clicked Attendance button for {roll_no}. Waiting for ASP.NET AJAX table render...")
+            except Exception as click_err:
+                logger.warning(f"JS click failed, trying Selenium click for {roll_no}: {click_err}")
+                att_btn.click()
+
+            # Dynamic wait loop for ASP.NET AJAX partial postback (ERP takes between 4-15s to query DB & render)
+            subjects = []
+            overall_percentage = "N/A"
+            max_wait_seconds = 22
+            start_wait = time.time()
+
+            while (time.time() - start_wait) < max_wait_seconds:
+                time.sleep(1)
+                page_html = driver.page_source
+                if "Overall" in page_html or "<table" in page_html:
+                    parsed_subjects, parsed_overall = parse_attendance_html(page_html)
+                    if parsed_subjects:
+                        subjects = parsed_subjects
+                        overall_percentage = parsed_overall
+                        elapsed = int(time.time() - start_wait)
+                        logger.info(f"Attendance table successfully loaded after {elapsed}s for {roll_no}")
+                        break
 
             if not subjects:
+                # Check if ERP returned a specific status or alert label
+                status_text = ""
+                try:
+                    status_elem = driver.find_elements(By.ID, "ContentPlaceHolder1_lblstatus")
+                    if status_elem and status_elem[0].text.strip():
+                        status_text = f" ERP Status: {status_elem[0].text.strip()}"
+                except Exception:
+                    pass
+
                 return {
                     "success": False,
-                    "error": "Attendance data table not found in ERP response.",
+                    "error": f"Attendance data table not found in ERP response within {max_wait_seconds}s.{status_text}",
                     "overall_percentage": overall_percentage,
                     "subjects": [],
                     "absences": [],

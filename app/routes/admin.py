@@ -367,3 +367,54 @@ async def trigger_cron_sync(background_tasks: BackgroundTasks, token: str = ""):
         "triggered_at_ist": datetime.now(IST_TZ).strftime("%d/%m/%Y %I:%M:%S %p IST")
     }
 
+class BroadcastRequest(BaseModel):
+    message: str
+
+def _send_broadcast_task(message_text: str):
+    from app.telegram_bot import telegram_service
+    import time
+    students = list(db.students.find({"is_active": {"$ne": False}}))
+    delivered = 0
+    for s in students:
+        cid = s.get("telegram_chat_id")
+        if cid:
+            try:
+                ok = telegram_service.send_message(cid, message_text)
+                if ok:
+                    delivered += 1
+                time.sleep(0.08)
+            except Exception as e:
+                logger.error(f"Broadcast failure to {s.get('roll_no')}: {e}")
+    logger.info(f"Broadcast delivered to {delivered}/{len(students)} active students.")
+
+@router.post("/api/admin/broadcast")
+async def admin_broadcast_endpoint(
+    payload: BroadcastRequest,
+    background_tasks: BackgroundTasks,
+    current_admin: dict = Depends(get_current_admin)
+):
+    msg = payload.message.strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="Message content cannot be empty.")
+    background_tasks.add_task(_send_broadcast_task, msg)
+    return {
+        "success": True,
+        "message": "Broadcast announcement queued for all active students."
+    }
+
+@router.api_route("/api/cron/broadcast", methods=["GET", "POST"])
+async def trigger_cron_broadcast(background_tasks: BackgroundTasks, token: str = ""):
+    expected = settings.JWT_SECRET[:16]
+    if token != expected and token != settings.JWT_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    msg = (
+        "📢 *LBRCE Attendance Bot Notice*\n\n"
+        "Dear Student,\n"
+        "Our attendance server is currently under maintenance. We will get back to you soon!\n\n"
+        "🛠️ *Our technical team is working on that.* Thank you for your patience."
+    )
+    background_tasks.add_task(_send_broadcast_task, msg)
+    return {"success": True, "message": "Maintenance notice broadcast queued."}
+
+
